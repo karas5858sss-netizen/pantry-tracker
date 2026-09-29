@@ -90,10 +90,11 @@ export async function fetchSession(): Promise<{ data?: SessionData; error?: ApiE
 
     return { data: body as SessionData };
   } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : String(err);
     console.error('Session fetch error:', err);
     return {
       error: {
-        error: 'Не удалось подключиться к серверу API. Проверьте соединение с интернетом.',
+        error: `Не удалось подключиться к серверу API (${errMsg}).`,
         code: 'AUTH_FAILED',
       },
     };
