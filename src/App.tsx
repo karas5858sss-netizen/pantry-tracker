@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { LiveScanner } from './components/LiveScanner.tsx';
 import { PhotoScanner } from './components/PhotoScanner.tsx';
 import { ManualBarcodeInput } from './components/ManualBarcodeInput.tsx';
 import { initTelegramApp, triggerHaptic } from './telegram.ts';
+import { fetchSession, type SessionData, type ApiError } from './api.ts';
+import { detectLanguage, t, type SupportedLanguage } from '@shared/i18n.ts';
 import type { BarcodeDetection } from './barcodeReader.ts';
 
 type ScanMode = 'live' | 'photo' | 'manual';
@@ -13,9 +15,35 @@ export const App: React.FC = () => {
   const [history, setHistory] = useState<BarcodeDetection[]>([]);
   const [copied, setCopied] = useState(false);
 
+  // Session state
+  const [session, setSession] = useState<SessionData | null>(null);
+  const [sessionLoading, setSessionLoading] = useState(true);
+  const [sessionError, setSessionError] = useState<ApiError | null>(null);
+
+  // Language state
+  const tgUser = typeof window !== 'undefined' ? window.Telegram?.WebApp?.initDataUnsafe?.user : undefined;
+  const [lang, setLang] = useState<SupportedLanguage>(() => detectLanguage(tgUser?.language_code));
+
+  const loadSession = useCallback(async () => {
+    setSessionLoading(true);
+    setSessionError(null);
+
+    const result = await fetchSession();
+    if (result.error) {
+      setSessionError(result.error);
+    } else if (result.data) {
+      setSession(result.data);
+      if (result.data.user.language_code) {
+        setLang(detectLanguage(result.data.user.language_code));
+      }
+    }
+    setSessionLoading(false);
+  }, []);
+
   useEffect(() => {
     initTelegramApp();
-  }, []);
+    loadSession();
+  }, [loadSession]);
 
   const handleDetected = (detection: BarcodeDetection) => {
     setCurrentResult(detection);
@@ -32,17 +60,65 @@ export const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-tg-bg text-tg-text flex flex-col items-center px-4 py-3 sm:py-6 max-w-md mx-auto">
       {/* Header */}
-      <header className="w-full flex items-center justify-between mb-4">
+      <header className="w-full flex items-center justify-between mb-3">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-tg-text flex items-center gap-2">
-            <span>📦 Pantry Tracker</span>
+            <span>📦 {t(lang, 'app_title')}</span>
           </h1>
-          <p className="text-xs text-tg-hint">Этап 0: Проверка камеры и сканера</p>
+          <p className="text-xs text-tg-hint">{t(lang, 'app_subtitle')}</p>
         </div>
-        <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 font-semibold">
-          Stage 0
-        </span>
+        <div className="flex items-center gap-1.5">
+          <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 font-semibold">
+            Stage 1
+          </span>
+        </div>
       </header>
+
+      {/* Session / User Bar */}
+      {session && (
+        <div className="w-full mb-3 px-3 py-2 bg-tg-secondary border border-tg-hint/15 rounded-xl flex items-center justify-between text-xs">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-400" />
+            <span className="font-semibold text-tg-text">{session.user.first_name}</span>
+            <span className="text-tg-hint">({session.currentPantry.name})</span>
+          </div>
+          <span className="text-[11px] text-tg-hint font-mono">{session.user.timezone}</span>
+        </div>
+      )}
+
+      {/* Session Loading State */}
+      {sessionLoading && (
+        <div className="w-full mb-3 p-3 bg-tg-secondary/70 border border-tg-hint/15 rounded-xl flex items-center justify-center gap-2 text-xs text-tg-hint">
+          <div className="w-3.5 h-3.5 border-2 border-tg-link border-t-transparent rounded-full animate-spin" />
+          <span>{t(lang, 'auth_checking')}</span>
+        </div>
+      )}
+
+      {/* Session Error / Access Denied Banner */}
+      {sessionError && !sessionLoading && (
+        <div className="w-full mb-4 p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-xl text-left text-xs">
+          <div className="flex items-center gap-1.5 font-bold text-amber-500 mb-1">
+            <span>⚠️</span>
+            <span>{sessionError.code === 'NOT_ALLOWED' ? 'Доступ ограничен' : 'Авторизация'}</span>
+          </div>
+          <p className="text-tg-hint leading-relaxed">{sessionError.error}</p>
+
+          {/* Show user ID so they can add it to allowed_users in SQL Editor */}
+          {tgUser?.id && (
+            <div className="mt-2 p-2 bg-black/10 dark:bg-white/5 rounded-lg font-mono text-[11px] text-tg-text">
+              Ваш Telegram ID: <span className="font-bold select-all">{tgUser.id}</span>
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={loadSession}
+            className="mt-2.5 px-3 py-1.5 bg-tg-button text-tg-button font-medium rounded-lg text-xs"
+          >
+            {t(lang, 'btn_retry')}
+          </button>
+        </div>
+      )}
 
       {/* Mode Switcher Tabs */}
       <nav className="w-full grid grid-cols-3 gap-1 bg-tg-secondary p-1 rounded-xl mb-4 border border-tg-hint/15">
@@ -59,7 +135,7 @@ export const App: React.FC = () => {
           }`}
         >
           <span>📹</span>
-          <span>Камера</span>
+          <span>{t(lang, 'mode_live')}</span>
         </button>
 
         <button
@@ -75,7 +151,7 @@ export const App: React.FC = () => {
           }`}
         >
           <span>📷</span>
-          <span>Фото</span>
+          <span>{t(lang, 'mode_photo')}</span>
         </button>
 
         <button
@@ -91,7 +167,7 @@ export const App: React.FC = () => {
           }`}
         >
           <span>⌨️</span>
-          <span>Вручную</span>
+          <span>{t(lang, 'mode_manual')}</span>
         </button>
       </nav>
 
@@ -121,7 +197,7 @@ export const App: React.FC = () => {
         <section className="w-full mt-4 bg-tg-secondary border border-tg-hint/25 rounded-2xl p-4 shadow-sm animate-fade-in">
           <div className="flex items-center justify-between mb-2">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-tg-hint">
-              Результат распознавания
+              {t(lang, 'scanner_scanned')}
             </span>
             <div className="flex items-center gap-1.5">
               <span className="text-[11px] px-2 py-0.5 rounded-md bg-tg-button/15 text-tg-link font-semibold">
@@ -149,19 +225,19 @@ export const App: React.FC = () => {
               onClick={() => copyToClipboard(currentResult.text)}
               className="px-3 py-1.5 bg-tg-bg border border-tg-hint/20 hover:border-tg-hint/40 rounded-xl text-xs font-medium text-tg-text transition active:scale-95"
             >
-              {copied ? ' Скопировано!' : '📋 Копировать'}
+              {copied ? ` ${t(lang, 'copied')}` : `📋 ${t(lang, 'btn_copy')}`}
             </button>
           </div>
 
           {currentResult.isValidEan ? (
             <p className="text-[12px] text-emerald-500 mt-2 flex items-center gap-1 font-medium">
               <span>✅</span>
-              <span>Контрольная сумма верна по стандарту GS1</span>
+              <span>{t(lang, 'ean_valid')}</span>
             </p>
           ) : (
             <p className="text-[12px] text-amber-500 mt-2 flex items-center gap-1">
               <span>⚠️</span>
-              <span>Штрихкод считан, но не является стандартным EAN-13/EAN-8</span>
+              <span>{t(lang, 'ean_invalid')}</span>
             </p>
           )}
         </section>
@@ -172,14 +248,14 @@ export const App: React.FC = () => {
         <section className="w-full mt-4">
           <div className="flex items-center justify-between mb-2 px-1">
             <span className="text-xs font-semibold text-tg-hint uppercase tracking-wider">
-              История сканирований ({history.length})
+              {t(lang, 'history_title')} ({history.length})
             </span>
             <button
               type="button"
               onClick={() => setHistory([])}
               className="text-[11px] text-tg-hint hover:text-tg-destructive transition"
             >
-              Очистить
+              {t(lang, 'history_clear')}
             </button>
           </div>
 
@@ -212,22 +288,6 @@ export const App: React.FC = () => {
           </div>
         </section>
       )}
-
-      {/* Testing checklist card for Human Acceptance */}
-      <section className="w-full mt-6 bg-tg-secondary/50 border border-tg-hint/15 rounded-2xl p-4 text-xs text-tg-hint">
-        <h2 className="font-bold text-tg-text text-sm mb-2 flex items-center gap-1.5">
-          <span>📋</span>
-          <span>Чек-лист проверки этапа 0:</span>
-        </h2>
-        <ul className="space-y-1.5 list-disc list-inside">
-          <li>Камера запускается без чёрного экрана на iOS</li>
-          <li>Разрешение запрашивается и запоминается</li>
-          <li>Штрихкод EAN-13 мгновенно считывается живым потоком</li>
-          <li>Запасной режим фото работает при съёмке камерой</li>
-          <li>Ручной ввод подсвечивает корректность контрольной цифры</li>
-          <li>Тема Telegram (светлая/тёмная) подхватывается автоматически</li>
-        </ul>
-      </section>
     </div>
   );
 };
