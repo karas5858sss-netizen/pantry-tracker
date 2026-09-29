@@ -2,9 +2,18 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { LiveScanner } from './components/LiveScanner.tsx';
 import { PhotoScanner } from './components/PhotoScanner.tsx';
 import { ManualBarcodeInput } from './components/ManualBarcodeInput.tsx';
+import { PantryModal } from './components/PantryModal.tsx';
 import { initTelegramApp, triggerHaptic } from './telegram.ts';
-import { fetchSession, type SessionData, type ApiError } from './api.ts';
+import {
+  fetchSession,
+  joinPantry,
+  updateWriteAccess,
+  type SessionData,
+  type ApiError,
+  type Pantry,
+} from './api.ts';
 import { detectLanguage, t, type SupportedLanguage } from '@shared/i18n.ts';
+import { parseStartParam } from '@shared/invites.ts';
 import type { BarcodeDetection } from './barcodeReader.ts';
 
 type ScanMode = 'live' | 'photo' | 'manual';
@@ -17,8 +26,14 @@ export const App: React.FC = () => {
 
   // Session state
   const [session, setSession] = useState<SessionData | null>(null);
+  const [currentPantry, setCurrentPantry] = useState<Pantry | null>(null);
+  const [pantries, setPantries] = useState<Pantry[]>([]);
   const [sessionLoading, setSessionLoading] = useState(true);
   const [sessionError, setSessionError] = useState<ApiError | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Modal state
+  const [isPantryModalOpen, setIsPantryModalOpen] = useState(false);
 
   // Language state
   const tgUser = typeof window !== 'undefined' ? window.Telegram?.WebApp?.initDataUnsafe?.user : undefined;
@@ -33,12 +48,47 @@ export const App: React.FC = () => {
       setSessionError(result.error);
     } else if (result.data) {
       setSession(result.data);
+      setPantries(result.data.pantries);
+      setCurrentPantry(result.data.currentPantry || result.data.pantries[0]);
+
       if (result.data.user.language_code) {
         setLang(detectLanguage(result.data.user.language_code));
       }
+
+      // 1. Request write access for notifications if not granted yet
+      if (!result.data.user.can_write_pm && typeof window !== 'undefined' && window.Telegram?.WebApp) {
+        try {
+          // @ts-expect-error Telegram WebApp method
+          window.Telegram.WebApp.requestWriteAccess?.((granted: boolean) => {
+            if (granted) {
+              updateWriteAccess(true);
+            }
+          });
+        } catch {
+          // Ignore
+        }
+      }
+
+      // 2. Check if launched via invite link start_param (e.g. join_<code>)
+      const startParam = window.Telegram?.WebApp?.initDataUnsafe?.start_param;
+      const parsedInvite = parseStartParam(startParam);
+      if (parsedInvite?.type === 'join') {
+        const joinRes = await joinPantry(parsedInvite.code);
+        if (joinRes.data) {
+          setPantries(joinRes.data.pantries);
+          setCurrentPantry(joinRes.data.pantry);
+          setToastMessage(t(lang, 'invite_joined_toast'));
+          triggerHaptic('success');
+          setTimeout(() => setToastMessage(null), 4000);
+        } else if (joinRes.error) {
+          setToastMessage(joinRes.error.error);
+          triggerHaptic('error');
+          setTimeout(() => setToastMessage(null), 4000);
+        }
+      }
     }
     setSessionLoading(false);
-  }, []);
+  }, [lang]);
 
   useEffect(() => {
     initTelegramApp();
@@ -59,6 +109,13 @@ export const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-tg-bg text-tg-text flex flex-col items-center px-4 py-3 sm:py-6 max-w-md mx-auto">
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed top-3 left-4 right-4 z-50 p-3 bg-emerald-500 text-white rounded-xl shadow-lg text-xs font-semibold text-center animate-bounce-short">
+          {toastMessage}
+        </div>
+      )}
+
       {/* Header */}
       <header className="w-full flex items-center justify-between mb-3">
         <div>
@@ -69,20 +126,44 @@ export const App: React.FC = () => {
         </div>
         <div className="flex items-center gap-1.5">
           <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 font-semibold">
-            Stage 1
+            Stage 2
           </span>
         </div>
       </header>
 
-      {/* Session / User Bar */}
-      {session && (
-        <div className="w-full mb-3 px-3 py-2 bg-tg-secondary border border-tg-hint/15 rounded-xl flex items-center justify-between text-xs">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-400" />
-            <span className="font-semibold text-tg-text">{session.user.first_name}</span>
-            <span className="text-tg-hint">({session.currentPantry.name})</span>
-          </div>
-          <span className="text-[11px] text-tg-hint font-mono">{session.user.timezone}</span>
+      {/* Pantry Bar / Switcher Button */}
+      {currentPantry && (
+        <div className="w-full mb-3 flex items-center justify-between p-2 bg-tg-secondary border border-tg-hint/15 rounded-xl text-xs">
+          <button
+            type="button"
+            onClick={() => {
+              setIsPantryModalOpen(true);
+              triggerHaptic('light');
+            }}
+            className="flex items-center gap-2 font-semibold text-tg-text hover:opacity-80 transition"
+          >
+            <span className="text-base">{currentPantry.role === 'owner' ? '👑' : '👥'}</span>
+            <div className="text-left">
+              <div className="flex items-center gap-1">
+                <span>{currentPantry.name}</span>
+                <span className="text-[10px] text-tg-hint">▼</span>
+              </div>
+              <div className="text-[10px] text-tg-hint font-normal">
+                {currentPantry.role === 'owner' ? t(lang, 'pantry_role_owner') : t(lang, 'pantry_role_member')}
+              </div>
+            </div>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setIsPantryModalOpen(true);
+              triggerHaptic('light');
+            }}
+            className="px-2.5 py-1.5 bg-tg-button/15 text-tg-link rounded-lg font-semibold text-xs transition active:scale-95"
+          >
+            🔗 {t(lang, 'pantry_invite_btn')}
+          </button>
         </div>
       )}
 
@@ -103,7 +184,6 @@ export const App: React.FC = () => {
           </div>
           <p className="text-tg-hint leading-relaxed">{sessionError.error}</p>
 
-          {/* Show user ID so they can add it to allowed_users in SQL Editor */}
           {tgUser?.id && (
             <div className="mt-2 p-2 bg-black/10 dark:bg-white/5 rounded-lg font-mono text-[11px] text-tg-text">
               Ваш Telegram ID: <span className="font-bold select-all">{tgUser.id}</span>
@@ -287,6 +367,23 @@ export const App: React.FC = () => {
             ))}
           </div>
         </section>
+      )}
+
+      {/* Pantry Management Modal */}
+      {currentPantry && session && (
+        <PantryModal
+          isOpen={isPantryModalOpen}
+          onClose={() => setIsPantryModalOpen(false)}
+          pantries={pantries}
+          currentPantry={currentPantry}
+          currentUserId={session.user.telegram_id}
+          lang={lang}
+          onSelectPantry={(p) => setCurrentPantry(p)}
+          onUpdatePantries={(updatedPantries, newActive) => {
+            setPantries(updatedPantries);
+            if (newActive) setCurrentPantry(newActive);
+          }}
+        />
       )}
     </div>
   );

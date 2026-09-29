@@ -3,7 +3,6 @@
  * Relative imports use .ts extension for Deno and Vitest cross-compatibility.
  */
 
-
 export interface UserRecord {
   telegram_id: number;
   first_name: string;
@@ -31,6 +30,24 @@ export interface PantryRecord {
   created_at: string;
 }
 
+export interface InviteRecord {
+  code: string;
+  pantry_id: string;
+  created_by: number;
+  expires_at: string;
+  max_uses: number;
+  uses: number;
+}
+
+export interface PantryMemberRecord {
+  pantry_id: string;
+  user_id: number;
+  role: 'owner' | 'member';
+  first_name: string;
+  username: string | null;
+  joined_at: string;
+}
+
 export interface DatabaseClient {
   isUserAllowed: (telegramId: number) => Promise<boolean>;
   getUsersCount: () => Promise<number>;
@@ -38,12 +55,34 @@ export interface DatabaseClient {
   upsertUser: (userData: UpsertUserData) => Promise<UserRecord>;
   getUserPantries: (telegramId: number) => Promise<PantryRecord[]>;
   createPantry: (name: string, ownerTelegramId: number) => Promise<PantryRecord>;
+
+  // Stage 2: Sharing and pantries management
+  getUserPantryMembership: (pantryId: string, userId: number) => Promise<'owner' | 'member' | null>;
+  getPantryMembers: (pantryId: string) => Promise<PantryMemberRecord[]>;
+  createPantryInvite: (
+    pantryId: string,
+    createdBy: number,
+    code: string,
+    expiresAt: string,
+    maxUses: number
+  ) => Promise<InviteRecord>;
+  getInvite: (code: string) => Promise<InviteRecord | null>;
+  joinPantryViaInvite: (
+    code: string,
+    userId: number
+  ) => Promise<{ pantry: PantryRecord; alreadyMember: boolean }>;
+  leavePantry: (pantryId: string, userId: number) => Promise<void>;
+  deletePantry: (pantryId: string, ownerId: number) => Promise<void>;
+  removePantryMember: (pantryId: string, ownerId: number, targetUserId: number) => Promise<void>;
+  updateCanWritePm: (userId: number, canWrite: boolean) => Promise<void>;
 }
 
 export interface ApiDependencies {
   db: DatabaseClient;
   botToken: string;
   now?: () => Date;
+  botUsername?: string;
+  appShortName?: string;
 }
 
 export interface SessionResponse {

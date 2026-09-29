@@ -1,0 +1,311 @@
+import type { ApiDependencies } from './types.ts';
+import type { TelegramUser } from '../../../shared/telegramAuth.ts';
+import { generateInviteCode, formatInviteLink, isValidInviteCode } from '../../../shared/invites.ts';
+
+export async function handleCreatePantry(
+  user: TelegramUser,
+  req: Request,
+  deps: ApiDependencies
+): Promise<Response> {
+  const isAllowed = await deps.db.isUserAllowed(user.id);
+  if (!isAllowed) {
+    return new Response(JSON.stringify({ error: 'Пользователь не в whitelist', code: 'NOT_ALLOWED' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  let name = 'Склад';
+  try {
+    const body = await req.json();
+    if (body?.name && typeof body.name === 'string' && body.name.trim()) {
+      name = body.name.trim();
+    }
+  } catch {
+    // default name
+  }
+
+  const pantry = await deps.db.createPantry(name, user.id);
+  return new Response(JSON.stringify({ pantry }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+export async function handleCreateInvite(
+  user: TelegramUser,
+  pantryId: string,
+  deps: ApiDependencies
+): Promise<Response> {
+  const membership = await deps.db.getUserPantryMembership(pantryId, user.id);
+  if (!membership) {
+    return new Response(JSON.stringify({ error: 'Нет доступа к данному складу', code: 'FORBIDDEN' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  const code = generateInviteCode(24);
+  const now = deps.now ? deps.now() : new Date();
+  // 48 hours validity
+  const expiresAt = new Date(now.getTime() + 48 * 60 * 60 * 1000).toISOString();
+  const maxUses = 1;
+
+  const invite = await deps.db.createPantryInvite(pantryId, user.id, code, expiresAt, maxUses);
+  const botName = deps.botUsername || 'sklad_jli_bot';
+  const appShortName = deps.appShortName || 'app';
+  const inviteUrl = formatInviteLink(botName, appShortName, invite.code);
+
+  return new Response(
+    JSON.stringify({
+      code: invite.code,
+      inviteUrl,
+      expiresAt: invite.expires_at,
+      maxUses: invite.max_uses,
+    }),
+    {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }
+  );
+}
+
+export async function handleJoinInvite(
+  user: TelegramUser,
+  req: Request,
+  deps: ApiDependencies
+): Promise<Response> {
+  // 1. Whitelist verification
+  const isAllowed = await deps.db.isUserAllowed(user.id);
+  if (!isAllowed) {
+    return new Response(
+      JSON.stringify({
+        error: 'Пользователь не найден в списке разрешенных (allowed_users)',
+        code: 'NOT_ALLOWED',
+      }),
+      {
+        status: 403,
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
+  }
+
+  let code = '';
+  try {
+    const body = await req.json();
+    if (body?.code && typeof body.code === 'string') {
+      code = body.code.trim();
+    }
+  } catch {
+    return new Response(JSON.stringify({ error: 'Не указан код инвайта' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  if (!isValidInviteCode(code)) {
+    return new Response(JSON.stringify({ error: 'Некорректный формат кода инвайта' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  // 2. Fetch invite
+  const invite = await deps.db.getInvite(code);
+  if (!invite) {
+    return new Response(
+      JSON.stringify({ error: 'Ссылка-приглашение не найдена или была отозвана', code: 'INVITE_NOT_FOUND' }),
+      {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
+  }
+
+  // 3. Expiration check
+  const nowMs = (deps.now ? deps.now() : new Date()).getTime();
+  const expiresAtMs = new Date(invite.expires_at).getTime();
+  if (expiresAtMs <= nowMs) {
+    return new Response(
+      JSON.stringify({
+        error: 'Срок действия приглашения истек (действует 48 часов)',
+        code: 'INVITE_EXPIRED',
+      }),
+      {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
+  }
+
+  // 4. Max uses check
+  if (invite.uses >= invite.max_uses) {
+    return new Response(
+      JSON.stringify({
+        error: 'Ссылка-приглашение уже была использована (одноразовая)',
+        code: 'INVITE_ALREADY_USED',
+      }),
+      {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
+  }
+
+  // 5. Consume invite and join
+  const joinResult = await deps.db.joinPantryViaInvite(code, user.id);
+  const pantries = await deps.db.getUserPantries(user.id);
+
+  return new Response(
+    JSON.stringify({
+      pantry: joinResult.pantry,
+      alreadyMember: joinResult.alreadyMember,
+      pantries,
+    }),
+    {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }
+  );
+}
+
+export async function handleLeavePantry(
+  user: TelegramUser,
+  pantryId: string,
+  deps: ApiDependencies
+): Promise<Response> {
+  const membership = await deps.db.getUserPantryMembership(pantryId, user.id);
+  if (!membership) {
+    return new Response(JSON.stringify({ error: 'Вы не состоите в этом складе', code: 'FORBIDDEN' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  if (membership === 'owner') {
+    return new Response(
+      JSON.stringify({
+        error: 'Владелец не может покинуть склад. Вы можете удалить его, если хотите закрыть склад.',
+        code: 'OWNER_CANNOT_LEAVE',
+      }),
+      {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
+  }
+
+  await deps.db.leavePantry(pantryId, user.id);
+  const pantries = await deps.db.getUserPantries(user.id);
+
+  return new Response(JSON.stringify({ success: true, pantries }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+export async function handleDeletePantry(
+  user: TelegramUser,
+  pantryId: string,
+  deps: ApiDependencies
+): Promise<Response> {
+  const membership = await deps.db.getUserPantryMembership(pantryId, user.id);
+  if (membership !== 'owner') {
+    return new Response(
+      JSON.stringify({ error: 'Только владелец может удалить склад', code: 'ONLY_OWNER_CAN_DELETE' }),
+      {
+        status: 403,
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
+  }
+
+  await deps.db.deletePantry(pantryId, user.id);
+  const pantries = await deps.db.getUserPantries(user.id);
+
+  return new Response(JSON.stringify({ success: true, pantries }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+export async function handleRemoveMember(
+  user: TelegramUser,
+  pantryId: string,
+  req: Request,
+  deps: ApiDependencies
+): Promise<Response> {
+  const membership = await deps.db.getUserPantryMembership(pantryId, user.id);
+  if (membership !== 'owner') {
+    return new Response(
+      JSON.stringify({ error: 'Только владелец может исключать участников', code: 'ONLY_OWNER_CAN_REMOVE' }),
+      {
+        status: 403,
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
+  }
+
+  let targetUserId = 0;
+  try {
+    const body = await req.json();
+    targetUserId = Number(body?.user_id);
+  } catch {
+    // invalid body
+  }
+
+  if (!targetUserId || targetUserId === user.id) {
+    return new Response(JSON.stringify({ error: 'Некорректный ID участника' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  await deps.db.removePantryMember(pantryId, user.id, targetUserId);
+  const members = await deps.db.getPantryMembers(pantryId);
+
+  return new Response(JSON.stringify({ success: true, members }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+export async function handleGetMembers(
+  user: TelegramUser,
+  pantryId: string,
+  deps: ApiDependencies
+): Promise<Response> {
+  const membership = await deps.db.getUserPantryMembership(pantryId, user.id);
+  if (!membership) {
+    return new Response(JSON.stringify({ error: 'Нет доступа к данному складу', code: 'FORBIDDEN' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  const members = await deps.db.getPantryMembers(pantryId);
+  return new Response(JSON.stringify({ members }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+export async function handleUpdateWriteAccess(
+  user: TelegramUser,
+  req: Request,
+  deps: ApiDependencies
+): Promise<Response> {
+  let canWrite = false;
+  try {
+    const body = await req.json();
+    canWrite = Boolean(body?.can_write_pm);
+  } catch {
+    // default false
+  }
+
+  await deps.db.updateCanWritePm(user.id, canWrite);
+  return new Response(JSON.stringify({ success: true, can_write_pm: canWrite }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}

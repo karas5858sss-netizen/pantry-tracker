@@ -89,6 +89,26 @@ function createMockDb(): DatabaseClient & {
         created_at,
       };
     },
+
+    async getUserPantryMembership(_pantryId: string, _userId: number) {
+      return null;
+    },
+    async getPantryMembers(_pantryId: string) {
+      return [];
+    },
+    async createPantryInvite(pantryId: string, createdBy: number, code: string, expiresAt: string, maxUses: number) {
+      return { code, pantry_id: pantryId, created_by: createdBy, expires_at: expiresAt, max_uses: maxUses, uses: 0 };
+    },
+    async getInvite(_code: string) {
+      return null;
+    },
+    async joinPantryViaInvite(_code: string, _userId: number) {
+      throw new Error('Not implemented in session tests');
+    },
+    async leavePantry(_pantryId: string, _userId: number) {},
+    async deletePantry(_pantryId: string, _ownerId: number) {},
+    async removePantryMember(_pantryId: string, _ownerId: number, _targetUserId: number) {},
+    async updateCanWritePm(_userId: number, _canWrite: boolean) {},
   };
 }
 
