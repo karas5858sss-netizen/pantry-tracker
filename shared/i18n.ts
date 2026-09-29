@@ -70,6 +70,9 @@ export const translations = {
     invite_joined_toast: 'Вы успешно присоединились к новому складу!',
     invite_expired: 'Срок действия приглашения истек (48 ч)',
     invite_used: 'Ссылка-приглашение уже была использована',
+    invite_enter_code_tab: 'Ввести код',
+    invite_enter_code_placeholder: 'Код или ссылка-приглашение',
+    invite_join_btn: 'Присоединиться к складу',
 
     // Common
     btn_retry: 'Повторить',
@@ -142,6 +145,9 @@ export const translations = {
     invite_joined_toast: '¡Te has unido con éxito a la nueva despensa!',
     invite_expired: 'La invitación ha caducado (48h)',
     invite_used: 'El enlace de invitación ya ha sido utilizado',
+    invite_enter_code_tab: 'Ingresar código',
+    invite_enter_code_placeholder: 'Código o enlace de invitación',
+    invite_join_btn: 'Unirse a la despensa',
 
     // Common
     btn_retry: 'Reintentar',
@@ -214,6 +220,9 @@ export const translations = {
     invite_joined_toast: 'You successfully joined the new pantry!',
     invite_expired: 'Invite link has expired (48h)',
     invite_used: 'Invite link has already been used',
+    invite_enter_code_tab: 'Enter code',
+    invite_enter_code_placeholder: 'Invite code or link',
+    invite_join_btn: 'Join pantry',
 
     // Common
     btn_retry: 'Retry',

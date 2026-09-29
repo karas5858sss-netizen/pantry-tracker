@@ -9,6 +9,7 @@ import {
   leavePantry,
   deletePantry,
   createPantry,
+  joinPantry,
 } from '../api.ts';
 import { t, type SupportedLanguage } from '@shared/i18n.ts';
 import { triggerHaptic } from '../telegram.ts';
@@ -43,6 +44,8 @@ export const PantryModal: React.FC<PantryModalProps> = ({
   const [newPantryName, setNewPantryName] = useState('');
   const [creatingPantry, setCreatingPantry] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [inputInviteCode, setInputInviteCode] = useState('');
+  const [joiningByCode, setJoiningByCode] = useState(false);
 
   // Load members when members tab is opened
   useEffect(() => {
@@ -157,6 +160,32 @@ export const PantryModal: React.FC<PantryModalProps> = ({
     }
   };
 
+  const handleJoinByCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = inputInviteCode.trim();
+    if (!trimmed) return;
+
+    const match =
+      trimmed.match(/startapp=join_([A-Za-z0-9_-]+)/) ||
+      trimmed.match(/join_([A-Za-z0-9_-]+)/) ||
+      trimmed.match(/([A-Za-z0-9_-]{16,64})/);
+    const code = match ? match[1] : trimmed;
+
+    setJoiningByCode(true);
+    setActionError(null);
+    const res = await joinPantry(code);
+    if (res.data) {
+      onUpdatePantries(res.data.pantries, res.data.pantry);
+      setInputInviteCode('');
+      triggerHaptic('success');
+      onClose();
+    } else if (res.error) {
+      setActionError(res.error.error);
+      triggerHaptic('error');
+    }
+    setJoiningByCode(false);
+  };
+
   const isOwner = currentPantry.role === 'owner';
 
   return (
@@ -262,6 +291,28 @@ export const PantryModal: React.FC<PantryModalProps> = ({
                   )}
                 </div>
               ))}
+
+              <form onSubmit={handleJoinByCode} className="pt-3 border-t border-tg-hint/15 space-y-1.5">
+                <label className="block text-[11px] font-medium text-tg-hint">
+                  {t(lang, 'invite_enter_code_placeholder')}:
+                </label>
+                <div className="flex gap-1.5">
+                  <input
+                    type="text"
+                    value={inputInviteCode}
+                    onChange={(e) => setInputInviteCode(e.target.value)}
+                    placeholder="Вставьте ссылку или код"
+                    className="flex-1 p-2 rounded-xl bg-tg-secondary border border-tg-hint/20 text-tg-text text-xs focus:outline-none focus:ring-1 focus:ring-tg-button"
+                  />
+                  <button
+                    type="submit"
+                    disabled={joiningByCode || !inputInviteCode.trim()}
+                    className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-xl text-xs transition disabled:opacity-50"
+                  >
+                    {joiningByCode ? '...' : t(lang, 'invite_join_btn')}
+                  </button>
+                </div>
+              </form>
             </div>
           )}
 
