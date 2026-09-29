@@ -14,7 +14,13 @@ import type {
   PantryRecord,
   InviteRecord,
   PantryMemberRecord,
+  ProductRecord,
 } from './types.ts';
+import {
+  getOffApiUrl,
+  extractOffProductName,
+  OFF_USER_AGENT,
+} from '../../../shared/products.ts';
 
 // @ts-expect-error Deno global
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
@@ -302,13 +308,74 @@ const db: DatabaseClient = {
       console.warn('Failed to update can_write_pm:', error);
     }
   },
+
+  async getProduct(barcode: string): Promise<ProductRecord | null> {
+    const { data, error } = await supabase
+      .from('products')
+      .select('*')
+      .eq('barcode', barcode)
+      .maybeSingle();
+
+    if (error) {
+      console.error('Error fetching product:', error);
+      return null;
+    }
+    return data;
+  },
+
+  async upsertProduct(barcode: string, name: string, source: 'manual' | 'off'): Promise<ProductRecord> {
+    const now = new Date().toISOString();
+    const { data, error } = await supabase
+      .from('products')
+      .upsert(
+        {
+          barcode,
+          name,
+          source,
+          updated_at: now,
+        },
+        { onConflict: 'barcode' }
+      )
+      .select()
+      .single();
+
+    if (error) {
+      throw new Error(`Failed to upsert product: ${error.message}`);
+    }
+    return data;
+  },
 };
+
+async function fetchOffProduct(barcode: string, lang: 'ru' | 'es' | 'en'): Promise<string | null> {
+  try {
+    const url = getOffApiUrl(barcode);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3500);
+
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        'User-Agent': OFF_USER_AGENT,
+        Accept: 'application/json',
+      },
+    });
+    clearTimeout(timeout);
+
+    if (!res.ok) return null;
+    const data = await res.json();
+    return extractOffProductName(data, lang);
+  } catch (err) {
+    console.warn(`[OFF fetch warning for ${barcode}]:`, err);
+    return null;
+  }
+}
 
 const deps: ApiDependencies = {
   db,
   botToken: BOT_TOKEN,
   botUsername: 'sklad_jli_bot',
   appShortName: 'app',
+  fetchOffProduct,
 };
 
 // @ts-expect-error Deno global

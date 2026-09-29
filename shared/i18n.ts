@@ -74,6 +74,20 @@ export const translations = {
     invite_enter_code_placeholder: 'Код или ссылка-приглашение',
     invite_join_btn: 'Присоединиться к складу',
 
+    // Stage 3: Products & Open Food Facts
+    product_found: 'Товар найден',
+    product_not_found: 'Товар не найден в базе. Введите название вручную',
+    product_name_label: 'Название товара',
+    product_name_placeholder: 'Например, Молоко 3.2%',
+    product_quantity_label: 'Количество',
+    product_source_off: 'Open Food Facts',
+    product_source_manual: 'Каталог',
+    product_source_custom: 'Вручную',
+    product_save_btn: 'Сохранить товар',
+    product_edit_name: 'Изменить',
+    product_searching: 'Поиск товара в базе...',
+    product_saved_toast: 'Товар сохранен в каталог!',
+
     // Common
     btn_retry: 'Повторить',
     btn_copy: 'Копировать',
@@ -149,6 +163,20 @@ export const translations = {
     invite_enter_code_placeholder: 'Código o enlace de invitación',
     invite_join_btn: 'Unirse a la despensa',
 
+    // Stage 3: Products & Open Food Facts
+    product_found: 'Producto encontrado',
+    product_not_found: 'Producto no encontrado en la base de datos. Introduce el nombre manualmente',
+    product_name_label: 'Nombre del producto',
+    product_name_placeholder: 'Por ejemplo, Leche entera 1L',
+    product_quantity_label: 'Cantidad',
+    product_source_off: 'Open Food Facts',
+    product_source_manual: 'Catálogo',
+    product_source_custom: 'Manual',
+    product_save_btn: 'Guardar producto',
+    product_edit_name: 'Editar',
+    product_searching: 'Buscando producto...',
+    product_saved_toast: '¡Producto guardado en el catálogo!',
+
     // Common
     btn_retry: 'Reintentar',
     btn_copy: 'Copiar',
@@ -223,6 +251,20 @@ export const translations = {
     invite_enter_code_tab: 'Enter code',
     invite_enter_code_placeholder: 'Invite code or link',
     invite_join_btn: 'Join pantry',
+
+    // Stage 3: Products & Open Food Facts
+    product_found: 'Product found',
+    product_not_found: 'Product not found in database. Enter name manually',
+    product_name_label: 'Product name',
+    product_name_placeholder: 'For example, Whole Milk 1L',
+    product_quantity_label: 'Quantity',
+    product_source_off: 'Open Food Facts',
+    product_source_manual: 'Catalog',
+    product_source_custom: 'Manual',
+    product_save_btn: 'Save product',
+    product_edit_name: 'Edit',
+    product_searching: 'Searching product...',
+    product_saved_toast: 'Product saved to catalog!',
 
     // Common
     btn_retry: 'Retry',

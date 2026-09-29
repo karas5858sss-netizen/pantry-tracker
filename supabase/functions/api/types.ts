@@ -75,6 +75,17 @@ export interface DatabaseClient {
   deletePantry: (pantryId: string, ownerId: number) => Promise<void>;
   removePantryMember: (pantryId: string, ownerId: number, targetUserId: number) => Promise<void>;
   updateCanWritePm: (userId: number, canWrite: boolean) => Promise<void>;
+
+  // Stage 3: Products resolution and catalog
+  getProduct: (barcode: string) => Promise<ProductRecord | null>;
+  upsertProduct: (barcode: string, name: string, source: 'manual' | 'off') => Promise<ProductRecord>;
+}
+
+export interface ProductRecord {
+  barcode: string;
+  name: string;
+  source: 'manual' | 'off';
+  updated_at: string;
 }
 
 export interface ApiDependencies {
@@ -83,6 +94,7 @@ export interface ApiDependencies {
   now?: () => Date;
   botUsername?: string;
   appShortName?: string;
+  fetchOffProduct?: (barcode: string, lang: 'ru' | 'es' | 'en') => Promise<string | null>;
 }
 
 export interface SessionResponse {

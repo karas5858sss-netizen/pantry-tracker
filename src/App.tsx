@@ -3,6 +3,7 @@ import { LiveScanner } from './components/LiveScanner.tsx';
 import { PhotoScanner } from './components/PhotoScanner.tsx';
 import { ManualBarcodeInput } from './components/ManualBarcodeInput.tsx';
 import { PantryModal } from './components/PantryModal.tsx';
+import { ProductCardModal } from './components/ProductCardModal.tsx';
 import { initTelegramApp, triggerHaptic } from './telegram.ts';
 import {
   fetchSession,
@@ -23,6 +24,10 @@ export const App: React.FC = () => {
   const [currentResult, setCurrentResult] = useState<BarcodeDetection | null>(null);
   const [history, setHistory] = useState<BarcodeDetection[]>([]);
   const [copied, setCopied] = useState(false);
+
+  // Stage 3 Product modal state
+  const [selectedProductBarcode, setSelectedProductBarcode] = useState<string | null>(null);
+  const [isProductModalOpen, setIsProductModalOpen] = useState(false);
 
   // Session state
   const [session, setSession] = useState<SessionData | null>(null);
@@ -98,6 +103,8 @@ export const App: React.FC = () => {
   const handleDetected = (detection: BarcodeDetection) => {
     setCurrentResult(detection);
     setHistory((prev) => [detection, ...prev.filter((d) => d.text !== detection.text)].slice(0, 8));
+    setSelectedProductBarcode(detection.text);
+    setIsProductModalOpen(true);
   };
 
   const copyToClipboard = (text: string) => {
@@ -126,7 +133,7 @@ export const App: React.FC = () => {
         </div>
         <div className="flex items-center gap-1.5">
           <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 font-semibold">
-            Stage 2
+            Stage 3
           </span>
         </div>
       </header>
@@ -295,18 +302,32 @@ export const App: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex items-center justify-between gap-3 mt-1">
+          <div className="flex items-center justify-between gap-2 mt-1">
             <span className="font-mono text-xl sm:text-2xl font-bold tracking-widest text-tg-text select-all">
               {currentResult.text}
             </span>
 
-            <button
-              type="button"
-              onClick={() => copyToClipboard(currentResult.text)}
-              className="px-3 py-1.5 bg-tg-bg border border-tg-hint/20 hover:border-tg-hint/40 rounded-xl text-xs font-medium text-tg-text transition active:scale-95"
-            >
-              {copied ? ` ${t(lang, 'copied')}` : `📋 ${t(lang, 'btn_copy')}`}
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedProductBarcode(currentResult.text);
+                  setIsProductModalOpen(true);
+                }}
+                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold transition active:scale-95 flex items-center gap-1"
+              >
+                <span>🔍</span>
+                <span>Определить</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => copyToClipboard(currentResult.text)}
+                className="px-3 py-1.5 bg-tg-bg border border-tg-hint/20 hover:border-tg-hint/40 rounded-xl text-xs font-medium text-tg-text transition active:scale-95"
+              >
+                {copied ? ` ${t(lang, 'copied')}` : `📋 ${t(lang, 'btn_copy')}`}
+              </button>
+            </div>
           </div>
 
           {currentResult.isValidEan ? (
@@ -343,7 +364,11 @@ export const App: React.FC = () => {
             {history.map((item) => (
               <div
                 key={`${item.text}-${item.timestamp}`}
-                onClick={() => setCurrentResult(item)}
+                onClick={() => {
+                  setCurrentResult(item);
+                  setSelectedProductBarcode(item.text);
+                  setIsProductModalOpen(true);
+                }}
                 className="flex items-center justify-between p-2.5 bg-tg-secondary/70 hover:bg-tg-secondary border border-tg-hint/15 rounded-xl cursor-pointer transition text-xs"
               >
                 <div className="flex items-center gap-2">
@@ -382,6 +407,21 @@ export const App: React.FC = () => {
           onUpdatePantries={(updatedPantries, newActive) => {
             setPantries(updatedPantries);
             if (newActive) setCurrentPantry(newActive);
+          }}
+        />
+      )}
+
+      {/* Product Card / Recognition Modal */}
+      {selectedProductBarcode && (
+        <ProductCardModal
+          isOpen={isProductModalOpen}
+          barcode={selectedProductBarcode}
+          format={currentResult?.format}
+          lang={lang}
+          onClose={() => setIsProductModalOpen(false)}
+          onProductConfirmed={(p) => {
+            setToastMessage(`✓ Товар «${p.name}» (${p.quantity} шт.) подтвержден!`);
+            setTimeout(() => setToastMessage(null), 3500);
           }}
         />
       )}

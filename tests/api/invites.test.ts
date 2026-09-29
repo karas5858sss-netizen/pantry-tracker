@@ -209,6 +209,13 @@ function createMockDb(): DatabaseClient & {
         user.can_write_pm = canWrite;
       }
     },
+
+    async getProduct(_barcode: string) {
+      return null;
+    },
+    async upsertProduct(barcode: string, name: string, source: 'manual' | 'off') {
+      return { barcode, name, source, updated_at: new Date().toISOString() };
+    },
   };
 }
 

@@ -109,6 +109,12 @@ function createMockDb(): DatabaseClient & {
     async deletePantry(_pantryId: string, _ownerId: number) {},
     async removePantryMember(_pantryId: string, _ownerId: number, _targetUserId: number) {},
     async updateCanWritePm(_userId: number, _canWrite: boolean) {},
+    async getProduct(_barcode: string) {
+      return null;
+    },
+    async upsertProduct(barcode: string, name: string, source: 'manual' | 'off') {
+      return { barcode, name, source, updated_at: new Date().toISOString() };
+    },
   };
 }
 

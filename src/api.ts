@@ -202,3 +202,93 @@ export async function removePantryMember(pantryId: string, userId: number): Prom
     body: JSON.stringify({ user_id: userId }),
   });
 }
+
+export interface ProductInfo {
+  barcode: string;
+  name: string;
+  source: 'manual' | 'off';
+}
+
+/**
+ * Resolves a barcode against (1) internal DB -> (2) Open Food Facts -> (3) manual.
+ */
+export async function lookupProduct(
+  barcode: string,
+  lang: 'ru' | 'es' | 'en' = 'ru'
+): Promise<{ found: boolean; product: ProductInfo | null }> {
+  const cleanBarcode = barcode.trim();
+  if (!cleanBarcode) return { found: false, product: null };
+
+  // 1. Try our backend (which checks local DB and server-side OFF fallback)
+  const res = await requestApi<{ found: boolean; product: ProductInfo | null }>(
+    `/products/${encodeURIComponent(cleanBarcode)}?lang=${lang}`,
+    { method: 'GET' }
+  );
+
+  if (res.data?.found && res.data.product) {
+    return { found: true, product: res.data.product };
+  }
+
+  // 2. Direct client query to Open Food Facts if backend returned not found
+  try {
+    const offUrl = `https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(cleanBarcode)}.json`;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3500);
+
+    const offRes = await fetch(offUrl, {
+      signal: controller.signal,
+      headers: {
+        Accept: 'application/json',
+      },
+    });
+    clearTimeout(timeout);
+
+    if (offRes.ok) {
+      const offJson = await offRes.json();
+      // Dynamically import or extract
+      const prod = offJson?.product;
+      if (offJson?.status === 1 && prod) {
+        const langKey = `product_name_${lang}`;
+        const nameCandidate =
+          prod[langKey] ||
+          prod.product_name ||
+          prod[`generic_name_${lang}`] ||
+          prod.generic_name ||
+          prod.product_name_en;
+
+        if (nameCandidate && typeof nameCandidate === 'string' && nameCandidate.trim()) {
+          const cleanName = nameCandidate.trim();
+          // Cache in our DB for future scans
+          saveProduct(cleanBarcode, cleanName, 'off').catch(() => {});
+          return {
+            found: true,
+            product: {
+              barcode: cleanBarcode,
+              name: cleanName,
+              source: 'off',
+            },
+          };
+        }
+      }
+    }
+  } catch {
+    // Ignore client fetch errors and fall back to manual
+  }
+
+  return { found: false, product: null };
+}
+
+/**
+ * Saves or updates a product in the catalog.
+ */
+export async function saveProduct(
+  barcode: string,
+  name: string,
+  source: 'manual' | 'off' = 'manual'
+): Promise<{ data?: { product: ProductInfo }; error?: ApiError }> {
+  return requestApi<{ product: ProductInfo }>('/products', {
+    method: 'POST',
+    body: JSON.stringify({ barcode, name, source }),
+  });
+}
+

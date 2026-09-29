@@ -11,6 +11,7 @@ import {
   handleGetMembers,
   handleUpdateWriteAccess,
 } from './pantries.ts';
+import { handleGetProduct, handleUpsertProduct } from './products.ts';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -138,6 +139,21 @@ export async function handleApiRequest(req: Request, deps: ApiDependencies): Pro
   if (getMembersMatch && req.method === 'GET') {
     const pantryId = getMembersMatch[1];
     const res = await handleGetMembers(user, pantryId, deps);
+    return addCors(res);
+  }
+
+  // Route: GET /products/:barcode (resolve barcode)
+  const productMatch = pathname.match(/^\/products\/([^/]+)$/);
+  if (productMatch && req.method === 'GET') {
+    const barcode = productMatch[1];
+    const lang = (url.searchParams.get('lang') || user.language_code || 'ru') as 'ru' | 'es' | 'en';
+    const res = await handleGetProduct(user, barcode, lang, deps);
+    return addCors(res);
+  }
+
+  // Route: POST /products (upsert product in catalog)
+  if (pathname === '/products' && req.method === 'POST') {
+    const res = await handleUpsertProduct(user, req, deps);
     return addCors(res);
   }
 
