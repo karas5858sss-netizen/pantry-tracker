@@ -16,14 +16,15 @@ export const LiveScanner: React.FC<LiveScannerProps> = ({ onDetected, onSwitchTo
   const [isScanning, setIsScanning] = useState(true);
   const [hasTorch, setHasTorch] = useState(false);
   const [torchOn, setTorchOn] = useState(false);
-  const [lastScanned, setLastScanned] = useState<string | null>(null);
   const [flashSuccess, setFlashSuccess] = useState(false);
   const [activeBadge, setActiveBadge] = useState<BarcodeDetection | null>(null);
 
   const streamRef = useRef<MediaStream | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const isDecodingRef = useRef(false);
+  const decodeStartTimeRef = useRef(0);
   const lastScanTimeRef = useRef(0);
+  const lastScannedRef = useRef<string | null>(null);
   const badgeTimerRef = useRef<number | null>(null);
 
   // Stop camera stream cleanly
@@ -118,7 +119,7 @@ export const LiveScanner: React.FC<LiveScannerProps> = ({ onDetected, onSwitchTo
     }
   }, [stopStream]);
 
-  // Scan loop using requestAnimationFrame with throttling
+  // Continuous scan loop with robust watchdog and immediate execution
   useEffect(() => {
     let active = true;
 
@@ -129,51 +130,60 @@ export const LiveScanner: React.FC<LiveScannerProps> = ({ onDetected, onSwitchTo
       const video = videoRef.current;
       const canvas = canvasRef.current;
 
+      // Watchdog: If decoding has been stuck for > 1500ms, unblock it
+      if (isDecodingRef.current && now - decodeStartTimeRef.current > 1500) {
+        isDecodingRef.current = false;
+      }
+
+      // Check if video is actively playing with valid dimensions
       if (
         isScanning &&
         !isDecodingRef.current &&
         video &&
-        video.readyState >= 2 &&
+        video.videoWidth > 0 &&
+        video.videoHeight > 0 &&
         canvas &&
-        now - lastScanTimeRef.current > 140
+        now - lastScanTimeRef.current > 120
       ) {
+        // If browser paused video in background, resume it
+        if (video.paused) {
+          video.play().catch(() => {});
+        }
+
         lastScanTimeRef.current = now;
+        decodeStartTimeRef.current = now;
         isDecodingRef.current = true;
 
         try {
           const vw = video.videoWidth;
           const vh = video.videoHeight;
 
-          if (vw > 0 && vh > 0) {
-            canvas.width = vw;
-            canvas.height = vh;
-            const ctx = canvas.getContext('2d', { willReadFrequently: true });
-            if (ctx) {
-              ctx.drawImage(video, 0, 0, vw, vh);
-              const result = await decodeFromCanvas(canvas);
+          canvas.width = vw;
+          canvas.height = vh;
+          const ctx = canvas.getContext('2d', { willReadFrequently: true });
+          if (ctx) {
+            ctx.drawImage(video, 0, 0, vw, vh);
+            const result = await decodeFromCanvas(canvas);
 
-              if (result && active) {
-                if (result.text !== lastScanned) {
-                  setLastScanned(result.text);
+            if (result && active) {
+              if (result.text !== lastScannedRef.current) {
+                lastScannedRef.current = result.text;
 
-                  // 1. Crystal clear physical feedback: audio beep + tactile vibration
-                  playScanBeep();
-                  triggerHaptic('heavy');
-                  setTimeout(() => triggerHaptic('success'), 60);
+                // Audio, physical haptic, and visual feedback
+                playScanBeep();
+                triggerHaptic('heavy');
+                setTimeout(() => triggerHaptic('success'), 60);
 
-                  // 2. Visual flash animation
-                  setFlashSuccess(true);
-                  setTimeout(() => setFlashSuccess(false), 500);
+                setFlashSuccess(true);
+                setTimeout(() => setFlashSuccess(false), 500);
 
-                  // 3. Floating prominent result card right on top of viewfinder
-                  setActiveBadge(result);
-                  if (badgeTimerRef.current) clearTimeout(badgeTimerRef.current);
-                  badgeTimerRef.current = window.setTimeout(() => {
-                    setActiveBadge(null);
-                  }, 4000);
+                setActiveBadge(result);
+                if (badgeTimerRef.current) clearTimeout(badgeTimerRef.current);
+                badgeTimerRef.current = window.setTimeout(() => {
+                  setActiveBadge(null);
+                }, 4000);
 
-                  onDetected(result);
-                }
+                onDetected(result);
               }
             }
           }
@@ -200,7 +210,7 @@ export const LiveScanner: React.FC<LiveScannerProps> = ({ onDetected, onSwitchTo
         clearTimeout(badgeTimerRef.current);
       }
     };
-  }, [isScanning, lastScanned, onDetected]);
+  }, [isScanning, onDetected]);
 
   useEffect(() => {
     startCamera();
@@ -231,6 +241,12 @@ export const LiveScanner: React.FC<LiveScannerProps> = ({ onDetected, onSwitchTo
                 width: videoRef.current.videoWidth,
                 height: videoRef.current.videoHeight,
               });
+              videoRef.current.play().catch(() => {});
+            }
+          }}
+          onCanPlay={() => {
+            if (videoRef.current?.paused) {
+              videoRef.current.play().catch(() => {});
             }
           }}
         />
@@ -329,7 +345,10 @@ export const LiveScanner: React.FC<LiveScannerProps> = ({ onDetected, onSwitchTo
       <div className="w-full max-w-sm mt-3 flex items-center justify-between text-xs px-1">
         <button
           type="button"
-          onClick={() => setIsScanning(!isScanning)}
+          onClick={() => {
+            setIsScanning(!isScanning);
+            lastScannedRef.current = null;
+          }}
           className="text-tg-hint hover:text-tg-text flex items-center gap-1 font-medium transition"
         >
           {isScanning ? '⏸ Приостановить поток' : '▶️ Возобновить поток'}
@@ -337,7 +356,10 @@ export const LiveScanner: React.FC<LiveScannerProps> = ({ onDetected, onSwitchTo
 
         <button
           type="button"
-          onClick={startCamera}
+          onClick={() => {
+            lastScannedRef.current = null;
+            startCamera();
+          }}
           className="text-tg-link hover:underline font-medium"
         >
           🔄 Перезапустить камеру

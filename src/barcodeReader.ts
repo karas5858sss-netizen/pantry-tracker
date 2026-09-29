@@ -1,6 +1,7 @@
 import {
   readBarcodes,
   setZXingModuleOverrides,
+  prepareZXingModule,
   type ReadResult,
 } from 'zxing-wasm/reader';
 import { isValidEan } from '@shared/ean.ts';
@@ -19,11 +20,16 @@ export function initBarcodeReader() {
         return scriptDir + path;
       },
     });
+    // Pre-warm WASM module immediately
+    prepareZXingModule();
     initialized = true;
   } catch (err) {
     console.warn('ZXing module override error:', err);
   }
 }
+
+// Automatically initialize and pre-warm WASM on bundle evaluation
+initBarcodeReader();
 
 export interface BarcodeDetection {
   text: string;
