@@ -34,6 +34,7 @@ declare global {
         viewportStableHeight?: number;
       };
     };
+    webkitAudioContext?: typeof AudioContext;
   }
 }
 
@@ -48,11 +49,48 @@ export function initTelegramApp() {
   }
 }
 
-export function triggerHaptic(type: 'success' | 'warning' | 'error' | 'light' = 'success') {
+let audioCtx: AudioContext | null = null;
+
+/**
+ * Standard warehouse/retail scanner confirmation beep (880Hz, 90ms).
+ */
+export function playScanBeep() {
+  try {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return;
+
+    if (!audioCtx || audioCtx.state === 'closed') {
+      audioCtx = new AudioContextClass();
+    }
+
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
+
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+
+    osc.type = 'sine';
+    // Clear 880Hz beep
+    osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+    gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.09);
+
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.09);
+  } catch (e) {
+    console.debug('Audio beep omitted:', e);
+  }
+}
+
+export function triggerHaptic(type: 'success' | 'warning' | 'error' | 'light' | 'heavy' = 'success') {
   if (typeof window !== 'undefined' && window.Telegram?.WebApp?.HapticFeedback) {
     try {
-      if (type === 'light') {
-        window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
+      if (type === 'light' || type === 'heavy') {
+        window.Telegram.WebApp.HapticFeedback.impactOccurred(type);
       } else {
         window.Telegram.WebApp.HapticFeedback.notificationOccurred(type);
       }
@@ -61,7 +99,7 @@ export function triggerHaptic(type: 'success' | 'warning' | 'error' | 'light' = 
     }
   } else if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
     try {
-      if (type === 'success') navigator.vibrate?.([40, 30, 40]);
+      if (type === 'success' || type === 'heavy') navigator.vibrate?.([60, 30, 60]);
       else if (type === 'error') navigator.vibrate?.([100, 50, 100]);
       else navigator.vibrate?.(40);
     } catch {

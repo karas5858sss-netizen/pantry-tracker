@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { decodeFromCanvas, type BarcodeDetection } from '../barcodeReader.ts';
-import { triggerHaptic } from '../telegram.ts';
+import { triggerHaptic, playScanBeep } from '../telegram.ts';
 
 interface LiveScannerProps {
   onDetected: (detection: BarcodeDetection) => void;
@@ -17,11 +17,14 @@ export const LiveScanner: React.FC<LiveScannerProps> = ({ onDetected, onSwitchTo
   const [hasTorch, setHasTorch] = useState(false);
   const [torchOn, setTorchOn] = useState(false);
   const [lastScanned, setLastScanned] = useState<string | null>(null);
+  const [flashSuccess, setFlashSuccess] = useState(false);
+  const [activeBadge, setActiveBadge] = useState<BarcodeDetection | null>(null);
 
   const streamRef = useRef<MediaStream | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const isDecodingRef = useRef(false);
   const lastScanTimeRef = useRef(0);
+  const badgeTimerRef = useRef<number | null>(null);
 
   // Stop camera stream cleanly
   const stopStream = useCallback(() => {
@@ -69,7 +72,6 @@ export const LiveScanner: React.FC<LiveScannerProps> = ({ onDetected, onSwitchTo
     }
 
     try {
-      // Constraints optimized for barcode scanning on mobile
       const constraints: MediaStreamConstraints = {
         audio: false,
         video: {
@@ -92,7 +94,6 @@ export const LiveScanner: React.FC<LiveScannerProps> = ({ onDetected, onSwitchTo
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        // Required for iOS Safari / Telegram WebApp
         videoRef.current.setAttribute('playsinline', 'true');
         videoRef.current.setAttribute('webkit-playsinline', 'true');
         videoRef.current.muted = true;
@@ -117,7 +118,7 @@ export const LiveScanner: React.FC<LiveScannerProps> = ({ onDetected, onSwitchTo
     }
   }, [stopStream]);
 
-  // Scan loop using requestAnimationFrame with 150ms throttling
+  // Scan loop using requestAnimationFrame with throttling
   useEffect(() => {
     let active = true;
 
@@ -128,7 +129,6 @@ export const LiveScanner: React.FC<LiveScannerProps> = ({ onDetected, onSwitchTo
       const video = videoRef.current;
       const canvas = canvasRef.current;
 
-      // Throttle scanning to avoid overheating and battery drain
       if (
         isScanning &&
         !isDecodingRef.current &&
@@ -145,7 +145,6 @@ export const LiveScanner: React.FC<LiveScannerProps> = ({ onDetected, onSwitchTo
           const vh = video.videoHeight;
 
           if (vw > 0 && vh > 0) {
-            // Draw central region to canvas for faster scanning
             canvas.width = vw;
             canvas.height = vh;
             const ctx = canvas.getContext('2d', { willReadFrequently: true });
@@ -154,10 +153,25 @@ export const LiveScanner: React.FC<LiveScannerProps> = ({ onDetected, onSwitchTo
               const result = await decodeFromCanvas(canvas);
 
               if (result && active) {
-                // Ignore same barcode within 1.5s
                 if (result.text !== lastScanned) {
                   setLastScanned(result.text);
-                  triggerHaptic('success');
+
+                  // 1. Crystal clear physical feedback: audio beep + tactile vibration
+                  playScanBeep();
+                  triggerHaptic('heavy');
+                  setTimeout(() => triggerHaptic('success'), 60);
+
+                  // 2. Visual flash animation
+                  setFlashSuccess(true);
+                  setTimeout(() => setFlashSuccess(false), 500);
+
+                  // 3. Floating prominent result card right on top of viewfinder
+                  setActiveBadge(result);
+                  if (badgeTimerRef.current) clearTimeout(badgeTimerRef.current);
+                  badgeTimerRef.current = window.setTimeout(() => {
+                    setActiveBadge(null);
+                  }, 4000);
+
                   onDetected(result);
                 }
               }
@@ -182,10 +196,12 @@ export const LiveScanner: React.FC<LiveScannerProps> = ({ onDetected, onSwitchTo
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
       }
+      if (badgeTimerRef.current) {
+        clearTimeout(badgeTimerRef.current);
+      }
     };
   }, [isScanning, lastScanned, onDetected]);
 
-  // Start camera on mount, stop on unmount
   useEffect(() => {
     startCamera();
     return () => {
@@ -196,7 +212,13 @@ export const LiveScanner: React.FC<LiveScannerProps> = ({ onDetected, onSwitchTo
   return (
     <div className="flex flex-col items-center w-full">
       {/* Video Container */}
-      <div className="relative w-full max-w-sm aspect-[4/3] sm:aspect-square bg-black rounded-2xl overflow-hidden shadow-lg border border-neutral-800">
+      <div
+        className={`relative w-full max-w-sm aspect-[4/3] sm:aspect-square bg-black rounded-2xl overflow-hidden shadow-lg border-2 transition-all duration-300 ${
+          flashSuccess
+            ? 'border-emerald-400 shadow-[0_0_24px_rgba(52,211,153,0.8)] scale-[1.01]'
+            : 'border-neutral-800'
+        }`}
+      >
         <video
           ref={videoRef}
           playsInline
@@ -213,23 +235,46 @@ export const LiveScanner: React.FC<LiveScannerProps> = ({ onDetected, onSwitchTo
           }}
         />
 
-        {/* Hidden offscreen canvas for frame extraction */}
+        {/* Hidden offscreen canvas */}
         <canvas ref={canvasRef} className="hidden" />
 
         {/* Viewfinder Overlay */}
         <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-          {/* Darkened corners mask */}
-          <div className="relative w-3/4 h-2/3 max-w-[280px] max-h-[180px] border-2 border-white/70 rounded-xl overflow-hidden shadow-[0_0_0_9999px_rgba(0,0,0,0.45)]">
+          <div
+            className={`relative w-3/4 h-2/3 max-w-[280px] max-h-[180px] border-2 rounded-xl overflow-hidden shadow-[0_0_0_9999px_rgba(0,0,0,0.45)] transition-colors duration-200 ${
+              flashSuccess ? 'border-emerald-300 bg-emerald-500/20' : 'border-white/70'
+            }`}
+          >
             {/* Corner highlights */}
             <div className="absolute top-0 left-0 w-4 h-4 border-t-4 border-l-4 border-emerald-400 rounded-tl-sm" />
             <div className="absolute top-0 right-0 w-4 h-4 border-t-4 border-r-4 border-emerald-400 rounded-tr-sm" />
             <div className="absolute bottom-0 left-0 w-4 h-4 border-b-4 border-l-4 border-emerald-400 rounded-bl-sm" />
             <div className="absolute bottom-0 right-0 w-4 h-4 border-b-4 border-r-4 border-emerald-400 rounded-br-sm" />
 
-            {/* Animated Laser line */}
+            {/* Laser line */}
             <div className="absolute left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-emerald-400 to-transparent scan-laser shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
           </div>
         </div>
+
+        {/* Instant floating notification badge directly over viewfinder */}
+        {activeBadge && (
+          <div className="absolute bottom-3 left-3 right-3 bg-black/85 backdrop-blur-md border border-emerald-400/60 rounded-xl p-2.5 text-white flex items-center justify-between shadow-2xl animate-bounce-short">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">✅</span>
+              <div>
+                <div className="font-mono font-bold text-base tracking-wider text-emerald-300">
+                  {activeBadge.text}
+                </div>
+                <div className="text-[10px] text-neutral-300">
+                  {activeBadge.format} • Контрольная сумма верна
+                </div>
+              </div>
+            </div>
+            <span className="text-[10px] uppercase font-semibold px-2 py-0.5 bg-emerald-500/30 text-emerald-200 rounded">
+              Считано!
+            </span>
+          </div>
+        )}
 
         {/* Stream info badge */}
         {streamInfo && (
