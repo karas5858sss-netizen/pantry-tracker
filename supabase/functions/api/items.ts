@@ -65,16 +65,25 @@ export async function handleCreateItem(
     );
   }
 
-  const createData: CreateItemData = {
-    pantry_id: pantryId,
-    barcode,
-    name,
-    expiration_date: expirationDate,
-    quantity,
-    created_by: user.id,
-  };
+  // Check if an active item with the same batch already exists in this pantry
+  const existingItem = await deps.db.findActiveItem(pantryId, expirationDate, barcode, name);
+  let item: ItemRecord;
 
-  const item: ItemRecord = await deps.db.createItem(createData);
+  if (existingItem) {
+    item = await deps.db.updateItem(existingItem.id, {
+      quantity: existingItem.quantity + quantity,
+    });
+  } else {
+    const createData: CreateItemData = {
+      pantry_id: pantryId,
+      barcode,
+      name,
+      expiration_date: expirationDate,
+      quantity,
+      created_by: user.id,
+    };
+    item = await deps.db.createItem(createData);
+  }
 
   // If a barcode was provided, also save product to catalog
   if (barcode) {
@@ -87,7 +96,7 @@ export async function handleCreateItem(
 
   return new Response(
     JSON.stringify({ item }),
-    { status: 201, headers: { 'Content-Type': 'application/json' } }
+    { status: existingItem ? 200 : 201, headers: { 'Content-Type': 'application/json' } }
   );
 }
 

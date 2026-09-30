@@ -4,6 +4,8 @@ import {
   getItemFreshness,
   sortItemsByFifo,
   selectFifoItem,
+  isSameBatch,
+  consolidatePantryItems,
   type InventoryItemLike,
 } from '../../shared/inventory.ts';
 
@@ -121,4 +123,63 @@ describe('Stage 5: Pure Inventory Domain Logic', () => {
       expect(res?.earliestItem.id).toBe('a');
     });
   });
+
+  describe('isSameBatch', () => {
+    it('returns true when barcode and expiration_date are identical', () => {
+      expect(
+        isSameBatch(
+          { barcode: '4601234567890', name: 'Молоко', expiration_date: '2026-10-15' },
+          { barcode: '4601234567890', name: 'Молоко 3.2%', expiration_date: '2026-10-15' }
+        )
+      ).toBe(true);
+    });
+
+    it('returns false when expiration_dates differ even with same barcode', () => {
+      expect(
+        isSameBatch(
+          { barcode: '4601234567890', name: 'Молоко', expiration_date: '2026-10-15' },
+          { barcode: '4601234567890', name: 'Молоко', expiration_date: '2026-10-20' }
+        )
+      ).toBe(false);
+    });
+
+    it('returns true when both have no barcode but matching trimmed lowercase name and same date', () => {
+      expect(
+        isSameBatch(
+          { barcode: null, name: 'Хлеб бородинский ', expiration_date: '2026-10-05' },
+          { barcode: null, name: 'хлеб бородинский', expiration_date: '2026-10-05' }
+        )
+      ).toBe(true);
+    });
+
+    it('returns false when one has barcode and other does not', () => {
+      expect(
+        isSameBatch(
+          { barcode: '123', name: 'Товар', expiration_date: '2026-10-05' },
+          { barcode: null, name: 'Товар', expiration_date: '2026-10-05' }
+        )
+      ).toBe(false);
+    });
+  });
+
+  describe('consolidatePantryItems', () => {
+    it('consolidates duplicates of the same batch into a single position with summed quantity', () => {
+      const items: InventoryItemLike[] = [
+        { id: 'item-1', pantry_id: 'p1', barcode: '4601234567890', name: 'Молоко', expiration_date: '2026-10-15', quantity: 1, status: 'active' },
+        { id: 'item-2', pantry_id: 'p1', barcode: '4601234567890', name: 'Молоко', expiration_date: '2026-10-15', quantity: 1, status: 'active' },
+        { id: 'item-3', pantry_id: 'p1', barcode: '4601234567890', name: 'Молоко', expiration_date: '2026-10-20', quantity: 1, status: 'active' }, // different date
+      ];
+
+      const res = consolidatePantryItems(items);
+      expect(res.consolidated).toHaveLength(2);
+      expect(res.consolidated[0].id).toBe('item-1');
+      expect(res.consolidated[0].quantity).toBe(2);
+      expect(res.consolidated[1].id).toBe('item-3');
+      expect(res.consolidated[1].quantity).toBe(1);
+
+      expect(res.duplicatesToRemove).toEqual(['item-2']);
+      expect(res.updatedQuantities.get('item-1')).toBe(2);
+    });
+  });
 });
+

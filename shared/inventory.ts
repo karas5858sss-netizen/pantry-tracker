@@ -102,3 +102,60 @@ export function selectFifoItem<T extends InventoryItemLike>(
     matchingItems: sorted,
   };
 }
+
+/**
+ * Checks if two items belong to the same batch (same expiration date and matching barcode/name).
+ */
+export function isSameBatch(
+  itemA: { barcode: string | null; name: string; expiration_date: string },
+  itemB: { barcode: string | null; name: string; expiration_date: string }
+): boolean {
+  if (itemA.expiration_date !== itemB.expiration_date) {
+    return false;
+  }
+  const barcodeA = itemA.barcode ? itemA.barcode.trim() : null;
+  const barcodeB = itemB.barcode ? itemB.barcode.trim() : null;
+  if (barcodeA && barcodeB) {
+    return barcodeA === barcodeB;
+  }
+  if (!barcodeA && !barcodeB) {
+    return itemA.name.trim().toLowerCase() === itemB.name.trim().toLowerCase();
+  }
+  return false;
+}
+
+export interface ConsolidateResult<T extends InventoryItemLike> {
+  consolidated: T[];
+  duplicatesToRemove: string[];
+  updatedQuantities: Map<string, number>;
+}
+
+/**
+ * Consolidates duplicate active items with the exact same batch (same expiration date and barcode/name).
+ * Merges quantities into the first occurrence and tracks duplicates to remove.
+ */
+export function consolidatePantryItems<T extends InventoryItemLike>(items: T[]): ConsolidateResult<T> {
+  const consolidated: T[] = [];
+  const duplicatesToRemove: string[] = [];
+  const updatedQuantities = new Map<string, number>();
+
+  for (const item of items) {
+    const existingIndex = consolidated.findIndex((c) => isSameBatch(c, item));
+    if (existingIndex !== -1) {
+      const primary = consolidated[existingIndex];
+      const newQty = primary.quantity + item.quantity;
+      primary.quantity = newQty;
+      duplicatesToRemove.push(item.id);
+      updatedQuantities.set(primary.id, newQty);
+    } else {
+      consolidated.push({ ...item });
+    }
+  }
+
+  return {
+    consolidated,
+    duplicatesToRemove,
+    updatedQuantities,
+  };
+}
+

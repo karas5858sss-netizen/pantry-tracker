@@ -92,6 +92,10 @@ function createMockDb(): DatabaseClient & {
     async getActiveItemsByBarcode(_pantryId: string, _barcode: string): Promise<ItemRecord[]> {
       return [];
     },
+    async findActiveItem(_pantryId: string, _exp: string, _bc?: string | null, _name?: string): Promise<ItemRecord | null> {
+      return null;
+    },
+    async deleteItems(_itemIds: string[]): Promise<void> {},
   };
 }
 

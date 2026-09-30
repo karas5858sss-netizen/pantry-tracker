@@ -28,6 +28,7 @@ import {
   extractUpcProductName,
   OFF_USER_AGENT,
 } from '../../../shared/products.ts';
+import { consolidatePantryItems } from '../../../shared/inventory.ts';
 
 // @ts-expect-error Deno global
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
@@ -379,13 +380,36 @@ const db: DatabaseClient = {
       .select('*')
       .eq('pantry_id', pantryId)
       .eq('status', status)
-      .order('expiration_date', { ascending: true });
+      .order('expiration_date', { ascending: true })
+      .order('created_at', { ascending: true });
 
     if (error) {
       console.error('Error fetching pantry items:', error);
       return [];
     }
-    return data ?? [];
+
+    const rawItems = (data ?? []) as ItemRecord[];
+    if (status !== 'active' || rawItems.length <= 1) {
+      return rawItems;
+    }
+
+    // Automatically consolidate any active duplicates of the same batch
+    const { consolidated, duplicatesToRemove, updatedQuantities } = consolidatePantryItems(rawItems);
+    if (duplicatesToRemove.length > 0) {
+      // Background async update to keep response instantaneous
+      (async () => {
+        try {
+          for (const [id, qty] of updatedQuantities.entries()) {
+            await supabase.from('items').update({ quantity: qty }).eq('id', id);
+          }
+          await supabase.from('items').delete().in('id', duplicatesToRemove);
+        } catch (err) {
+          console.error('Error persisting consolidated items in background:', err);
+        }
+      })();
+    }
+
+    return consolidated;
   },
 
   async getItem(itemId: string): Promise<ItemRecord | null> {
@@ -430,6 +454,40 @@ const db: DatabaseClient = {
       return [];
     }
     return data ?? [];
+  },
+
+  async findActiveItem(
+    pantryId: string,
+    expirationDate: string,
+    barcode?: string | null,
+    name?: string
+  ): Promise<ItemRecord | null> {
+    let query = supabase
+      .from('items')
+      .select('*')
+      .eq('pantry_id', pantryId)
+      .eq('expiration_date', expirationDate)
+      .eq('status', 'active');
+
+    if (barcode && barcode.trim()) {
+      query = query.eq('barcode', barcode.trim());
+    } else if (name && name.trim()) {
+      query = query.is('barcode', null).ilike('name', name.trim());
+    } else {
+      return null;
+    }
+
+    const { data, error } = await query.order('created_at', { ascending: true }).limit(1);
+    if (error || !data || data.length === 0) return null;
+    return data[0] as ItemRecord;
+  },
+
+  async deleteItems(itemIds: string[]): Promise<void> {
+    if (itemIds.length === 0) return;
+    const { error } = await supabase.from('items').delete().in('id', itemIds);
+    if (error) {
+      console.error('Error deleting duplicate items:', error);
+    }
   },
 };
 

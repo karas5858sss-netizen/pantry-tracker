@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { handleApiRequest } from '../../supabase/functions/api/handler.ts';
 import { createTestInitData, type TelegramUser } from '../../shared/telegramAuth.ts';
+import { consolidatePantryItems } from '../../shared/inventory.ts';
 import type {
   DatabaseClient,
   ApiDependencies,
@@ -190,9 +191,26 @@ function createMockDb(): DatabaseClient & {
     },
 
     async getPantryItems(pantryId: string, status: 'active' | 'consumed' | 'discarded' = 'active'): Promise<ItemRecord[]> {
-      return itemsList
+      const filtered = itemsList
         .filter((item) => item.pantry_id === pantryId && item.status === status)
         .sort((a, b) => a.expiration_date.localeCompare(b.expiration_date));
+
+      if (status !== 'active' || filtered.length <= 1) {
+        return filtered;
+      }
+
+      const { consolidated, duplicatesToRemove, updatedQuantities } = consolidatePantryItems(filtered);
+      if (duplicatesToRemove.length > 0) {
+        for (const [id, qty] of updatedQuantities.entries()) {
+          const it = itemsList.find((i) => i.id === id);
+          if (it) it.quantity = qty;
+        }
+        const toRemove = new Set(duplicatesToRemove);
+        const remaining = itemsList.filter((i) => !toRemove.has(i.id));
+        itemsList.length = 0;
+        itemsList.push(...remaining);
+      }
+      return consolidated;
     },
 
     async getItem(itemId: string): Promise<ItemRecord | null> {
@@ -214,6 +232,33 @@ function createMockDb(): DatabaseClient & {
       return itemsList
         .filter((item) => item.pantry_id === pantryId && item.barcode === barcode && item.status === 'active')
         .sort((a, b) => a.expiration_date.localeCompare(b.expiration_date));
+    },
+
+    async findActiveItem(
+      pantryId: string,
+      expirationDate: string,
+      barcode?: string | null,
+      name?: string
+    ): Promise<ItemRecord | null> {
+      return itemsList.find((item) => {
+        if (item.pantry_id !== pantryId || item.expiration_date !== expirationDate || item.status !== 'active') {
+          return false;
+        }
+        if (barcode && barcode.trim()) {
+          return item.barcode === barcode.trim();
+        }
+        if (name && name.trim()) {
+          return !item.barcode && item.name.trim().toLowerCase() === name.trim().toLowerCase();
+        }
+        return false;
+      }) || null;
+    },
+
+    async deleteItems(itemIds: string[]): Promise<void> {
+      const toRemove = new Set(itemIds);
+      const remaining = itemsList.filter((i) => !toRemove.has(i.id));
+      itemsList.length = 0;
+      itemsList.push(...remaining);
     },
   };
 }
@@ -358,6 +403,62 @@ describe('Stage 4: Items & Expiration Dates API', () => {
       const productInCatalog = await mockDb.getProduct('4607004891234');
       expect(productInCatalog).not.toBeNull();
       expect(productInCatalog?.name).toBe('Сок Яблочный 1л');
+    });
+
+    it('increments quantity instead of duplicating when adding item with same expiration date and barcode', async () => {
+      // 1. Add first time
+      const res1 = await makeAuthRequest(ownerUser, 'POST', '/pantries/pantry-1/items', {
+        barcode: '4609999999999',
+        name: 'Кефир 1%',
+        expiration_date: '2026-10-10',
+        quantity: 1,
+      });
+      expect(res1.status).toBe(201);
+      const data1 = await res1.json();
+      expect(data1.item.quantity).toBe(1);
+
+      // 2. Add second time with same barcode and same date
+      const res2 = await makeAuthRequest(ownerUser, 'POST', '/pantries/pantry-1/items', {
+        barcode: '4609999999999',
+        name: 'Кефир 1%',
+        expiration_date: '2026-10-10',
+        quantity: 2,
+      });
+      expect(res2.status).toBe(200);
+      const data2 = await res2.json();
+      expect(data2.item.id).toBe(data1.item.id); // Same item updated!
+      expect(data2.item.quantity).toBe(3); // 1 + 2 = 3
+
+      // Verify pantry list only has 1 item for this product
+      const listRes = await makeAuthRequest(ownerUser, 'GET', '/pantries/pantry-1/items');
+      const listData = await listRes.json();
+      const kefirItems = listData.items.filter((i: ItemRecord) => i.barcode === '4609999999999');
+      expect(kefirItems).toHaveLength(1);
+      expect(kefirItems[0].quantity).toBe(3);
+    });
+
+    it('creates separate batch when adding same barcode but with different expiration date', async () => {
+      // Batch A: 2026-10-10
+      await makeAuthRequest(ownerUser, 'POST', '/pantries/pantry-1/items', {
+        barcode: '4608888888888',
+        name: 'Масло',
+        expiration_date: '2026-10-10',
+        quantity: 1,
+      });
+
+      // Batch B: 2026-10-25 (different expiration date!)
+      const resB = await makeAuthRequest(ownerUser, 'POST', '/pantries/pantry-1/items', {
+        barcode: '4608888888888',
+        name: 'Масло',
+        expiration_date: '2026-10-25',
+        quantity: 2,
+      });
+      expect(resB.status).toBe(201);
+
+      const listRes = await makeAuthRequest(ownerUser, 'GET', '/pantries/pantry-1/items');
+      const listData = await listRes.json();
+      const butterItems = listData.items.filter((i: ItemRecord) => i.barcode === '4608888888888');
+      expect(butterItems).toHaveLength(2); // Two separate batches!
     });
   });
 

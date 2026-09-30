@@ -88,6 +88,13 @@ export interface DatabaseClient {
   getItem: (itemId: string) => Promise<ItemRecord | null>;
   updateItem: (itemId: string, updates: UpdateItemData) => Promise<ItemRecord>;
   getActiveItemsByBarcode: (pantryId: string, barcode: string) => Promise<ItemRecord[]>;
+  findActiveItem: (
+    pantryId: string,
+    expirationDate: string,
+    barcode?: string | null,
+    name?: string
+  ) => Promise<ItemRecord | null>;
+  deleteItems: (itemIds: string[]) => Promise<void>;
 }
 
 export interface UpdateItemData {
