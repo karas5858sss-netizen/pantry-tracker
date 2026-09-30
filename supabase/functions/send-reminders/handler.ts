@@ -150,9 +150,17 @@ export async function handleSendReminders(
         } else {
           const errBody = await tgRes.text().catch(() => '');
           console.warn(`Telegram API error for user ${user.telegram_id}: status ${tgRes.status}, body: ${errBody}`);
+          // Telegram temporary error (5xx, rate limit) -> rollback claim to allow retry on next run
+          if (deps.db.deleteReminderLogs) {
+            await deps.db.deleteReminderLogs(recordsToClaim);
+          }
         }
       } catch (sendErr) {
         console.error(`Failed to send reminder to user ${user.telegram_id}:`, sendErr);
+        // Network timeout/exception -> rollback claim to allow retry on next run
+        if (deps.db.deleteReminderLogs) {
+          await deps.db.deleteReminderLogs(recordsToClaim);
+        }
       }
     }
   }

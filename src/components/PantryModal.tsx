@@ -262,7 +262,7 @@ export const PantryModal: React.FC<PantryModalProps> = ({
           {/* TAB 1: SWITCH PANTRIES */}
           {activeTab === 'switch' && (
             <div className="space-y-2">
-              <p className="text-tg-hint mb-1">Выберите активный склад:</p>
+              <p className="text-tg-hint mb-1">{t(lang, 'pantry_choose_active')}</p>
               {pantries.map((p) => (
                 <div
                   key={p.id}
@@ -367,7 +367,7 @@ export const PantryModal: React.FC<PantryModalProps> = ({
             <div>
               <p className="text-tg-hint mb-2">{t(lang, 'pantry_members_title')}:</p>
               {loadingMembers ? (
-                <p className="text-center text-tg-hint py-4">Загрузка списка...</p>
+                <p className="text-center text-tg-hint py-4">{t(lang, 'pantry_loading_list')}</p>
               ) : (
                 <div className="space-y-1.5">
                   {members.map((m) => (

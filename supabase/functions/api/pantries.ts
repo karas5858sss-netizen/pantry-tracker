@@ -46,8 +46,8 @@ export async function handleCreateInvite(
   deps: ApiDependencies
 ): Promise<Response> {
   const membership = await deps.db.getUserPantryMembership(pantryId, user.id);
-  if (!membership) {
-    return new Response(JSON.stringify({ error: 'Нет доступа к данному складу', code: 'FORBIDDEN' }), {
+  if (!membership || membership !== 'owner') {
+    return new Response(JSON.stringify({ error: 'Только владелец склада может создавать приглашения', code: 'FORBIDDEN' }), {
       status: 403,
       headers: { 'Content-Type': 'application/json' },
     });
@@ -160,8 +160,50 @@ export async function handleJoinInvite(
     );
   }
 
-  // 5. Consume invite and join
-  const joinResult = await deps.db.joinPantryViaInvite(code, user.id);
+  // 5. Consume invite and join atomically
+  let joinResult;
+  try {
+    joinResult = await deps.db.joinPantryViaInvite(code, user.id);
+  } catch (err: any) {
+    if (err?.code === 'INVITE_ALREADY_USED' || err?.message === 'Invite already used') {
+      return new Response(
+        JSON.stringify({
+          error: 'Ссылка-приглашение уже была использована (одноразовая)',
+          code: 'INVITE_ALREADY_USED',
+        }),
+        {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+    }
+    if (err?.code === 'INVITE_EXPIRED' || err?.message === 'Invite expired') {
+      return new Response(
+        JSON.stringify({
+          error: 'Срок действия приглашения истек (действует 48 часов)',
+          code: 'INVITE_EXPIRED',
+        }),
+        {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+    }
+    if (err?.code === 'INVITE_NOT_FOUND' || err?.message === 'Invite not found') {
+      return new Response(
+        JSON.stringify({
+          error: 'Ссылка-приглашение не найдена или была отозвана',
+          code: 'INVITE_NOT_FOUND',
+        }),
+        {
+          status: 404,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+    }
+    throw err;
+  }
+
   const pantries = await deps.db.getUserPantries(user.id);
 
   return new Response(

@@ -339,7 +339,7 @@ export const InventoryList: React.FC<InventoryListProps> = ({
       {loading && (
         <div className="py-12 flex flex-col items-center justify-center text-tg-hint gap-3">
           <div className="w-8 h-8 border-3 border-tg-button border-t-transparent rounded-full animate-spin" />
-          <p className="text-xs font-medium">Загрузка запасов склада...</p>
+          <p className="text-xs font-medium">{t(lang, 'inventory_loading')}</p>
         </div>
       )}
 
@@ -365,7 +365,7 @@ export const InventoryList: React.FC<InventoryListProps> = ({
       {/* Filtered empty state */}
       {!loading && items.length > 0 && filteredItems.length === 0 && (
         <div className="py-8 text-center text-tg-hint text-xs">
-          Ничего не найдено по запросу «{searchQuery}»
+          {t(lang, 'inventory_empty_filtered')}
         </div>
       )}
 
@@ -378,7 +378,7 @@ export const InventoryList: React.FC<InventoryListProps> = ({
             const isFirst = idx === 0;
 
             let badgeClass = 'bg-emerald-500/15 text-emerald-500 border-emerald-500/25';
-            let statusText = `Годен до: ${formatDate(item.expiration_date)}`;
+            let statusText = `${t(lang, 'product_expires_label')} ${formatDate(item.expiration_date)}`;
 
             if (freshness.status === 'expired') {
               badgeClass = 'bg-red-500/15 text-red-500 border-red-500/25';
@@ -488,7 +488,7 @@ export const InventoryList: React.FC<InventoryListProps> = ({
         <div className="fixed bottom-4 left-4 right-4 z-50 p-3 bg-zinc-900 text-white rounded-2xl shadow-2xl border border-zinc-700 flex items-center justify-between gap-3 animate-slide-up">
           <div className="text-xs truncate">
             <span className="font-semibold">
-              {undoState.action === 'consumed' ? '🍽️ Списано:' : '🗑️ Выброшено:'}
+              {undoState.action === 'consumed' ? t(lang, 'undo_consumed') : t(lang, 'undo_discarded')}
             </span>{' '}
             <span>{undoState.item.name}</span>
           </div>

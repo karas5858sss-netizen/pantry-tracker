@@ -143,6 +143,17 @@ const db: SendRemindersDb = {
       console.warn('Failed to update can_write_pm in send-reminders:', error);
     }
   },
+
+  async deleteReminderLogs(records: Array<{ user_id: number; item_id: string; stage: number }>): Promise<void> {
+    for (const r of records) {
+      await supabase
+        .from('reminder_log')
+        .delete()
+        .eq('user_id', r.user_id)
+        .eq('item_id', r.item_id)
+        .eq('stage', r.stage);
+    }
+  },
 };
 
 const deps: SendRemindersDependencies = {

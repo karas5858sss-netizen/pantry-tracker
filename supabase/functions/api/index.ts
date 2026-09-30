@@ -29,7 +29,6 @@ import {
   extractUpcProductName,
   OFF_USER_AGENT,
 } from '../../../shared/products.ts';
-import { consolidatePantryItems } from '../../../shared/inventory.ts';
 
 // @ts-expect-error Deno global
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
@@ -81,7 +80,36 @@ const db: DatabaseClient = {
   },
 
   async upsertUser(userData: UpsertUserData): Promise<UserRecord> {
-    const { data, error } = await supabase
+    const { data, error } = await supabase.rpc('register_user_with_limit', {
+      p_telegram_id: userData.telegram_id,
+      p_first_name: userData.first_name,
+      p_username: userData.username ?? null,
+      p_language_code: userData.language_code ?? 'ru',
+      p_timezone: userData.timezone ?? 'Europe/Moscow',
+    });
+
+    if (!error && data) {
+      if (data.error === 'USER_LIMIT_REACHED') {
+        const limitErr = new Error('USER_LIMIT_REACHED');
+        (limitErr as any).code = 'USER_LIMIT_REACHED';
+        throw limitErr;
+      }
+      if (data.user) {
+        return data.user as UserRecord;
+      }
+    }
+
+    const isNotFound =
+      error?.code === '42883' ||
+      error?.message?.includes('could not find the function') ||
+      error?.message?.includes('does not exist');
+
+    if (error && !isNotFound) {
+      throw new Error(`Failed to upsert user: ${error.message}`);
+    }
+
+    // Fallback only if RPC function does not exist (e.g. mock DB in tests)
+    const { data: fallbackData, error: fallbackError } = await supabase
       .from('users')
       .upsert(
         {
@@ -96,10 +124,10 @@ const db: DatabaseClient = {
       .select()
       .single();
 
-    if (error || !data) {
-      throw new Error(`Failed to upsert user: ${error?.message}`);
+    if (fallbackError || !fallbackData) {
+      throw new Error(`Failed to upsert user: ${fallbackError?.message}`);
     }
-    return data as UserRecord;
+    return fallbackData as UserRecord;
   },
 
   async getUserPantries(telegramId: number): Promise<PantryRecord[]> {
@@ -220,6 +248,50 @@ const db: DatabaseClient = {
     code: string,
     userId: number
   ): Promise<{ pantry: PantryRecord; alreadyMember: boolean }> {
+    const { data, error } = await supabase.rpc('join_pantry_via_invite', {
+      p_code: code,
+      p_user_id: userId,
+    });
+
+    if (!error && data) {
+      if (data.error === 'INVITE_NOT_FOUND') {
+        const err = new Error('Invite not found');
+        (err as any).code = 'INVITE_NOT_FOUND';
+        throw err;
+      }
+      if (data.error === 'INVITE_EXPIRED') {
+        const err = new Error('Invite expired');
+        (err as any).code = 'INVITE_EXPIRED';
+        throw err;
+      }
+      if (data.error === 'INVITE_EXHAUSTED') {
+        const err = new Error('Invite already used');
+        (err as any).code = 'INVITE_ALREADY_USED';
+        throw err;
+      }
+      if (data.pantry) {
+        return {
+          pantry: {
+            id: data.pantry.id,
+            name: data.pantry.name,
+            role: data.already_member ? 'owner' : 'member',
+            created_at: data.pantry.created_at,
+          },
+          alreadyMember: Boolean(data.already_member),
+        };
+      }
+    }
+
+    const isNotFound =
+      error?.code === '42883' ||
+      error?.message?.includes('could not find the function') ||
+      error?.message?.includes('does not exist');
+
+    if (error && !isNotFound) {
+      throw new Error(`RPC join_pantry_via_invite failed: ${error.message}`);
+    }
+
+    // Fallback for mockDb / environments without the RPC function
     const invite = await this.getInvite(code);
     if (!invite) {
       throw new Error('Invite not found');
@@ -248,6 +320,12 @@ const db: DatabaseClient = {
       };
     }
 
+    if (invite.uses >= invite.max_uses) {
+      const err = new Error('Invite already used');
+      (err as any).code = 'INVITE_ALREADY_USED';
+      throw err;
+    }
+
     // Insert membership
     const { error: memberErr } = await supabase.from('pantry_members').insert({
       pantry_id: invite.pantry_id,
@@ -260,10 +338,14 @@ const db: DatabaseClient = {
     }
 
     // Increment uses
-    await supabase
+    const { error: updateErr } = await supabase
       .from('pantry_invites')
       .update({ uses: invite.uses + 1 })
       .eq('code', code);
+
+    if (updateErr) {
+      throw new Error(`Failed to update invite uses: ${updateErr.message}`);
+    }
 
     return {
       pantry: {
@@ -414,28 +496,7 @@ const db: DatabaseClient = {
       return [];
     }
 
-    const rawItems = (data ?? []) as ItemRecord[];
-    if (status !== 'active' || rawItems.length <= 1) {
-      return rawItems;
-    }
-
-    // Automatically consolidate any active duplicates of the same batch
-    const { consolidated, duplicatesToRemove, updatedQuantities } = consolidatePantryItems(rawItems);
-    if (duplicatesToRemove.length > 0) {
-      // Background async update to keep response instantaneous
-      (async () => {
-        try {
-          for (const [id, qty] of updatedQuantities.entries()) {
-            await supabase.from('items').update({ quantity: qty }).eq('id', id);
-          }
-          await supabase.from('items').delete().in('id', duplicatesToRemove);
-        } catch (err) {
-          console.error('Error persisting consolidated items in background:', err);
-        }
-      })();
-    }
-
-    return consolidated;
+    return (data ?? []) as ItemRecord[];
   },
 
   async getItem(itemId: string): Promise<ItemRecord | null> {
@@ -539,15 +600,27 @@ const db: DatabaseClient = {
       p_created_by: itemData.created_by,
     });
 
-    if (error || !data) {
-      // Fallback if RPC not active
-      const existing = await this.findActiveItem(itemData.pantry_id, itemData.expiration_date, itemData.barcode, itemData.name);
-      if (existing) {
-        const updated = await this.updateItem(existing.id, { quantity: existing.quantity + (itemData.quantity ?? 1) });
-        return { item: updated, merged: true };
+    if (error) {
+      const isNotFound =
+        error.code === '42883' ||
+        error.message?.includes('could not find the function') ||
+        error.message?.includes('does not exist');
+
+      if (isNotFound) {
+        console.warn('merge_or_create_item RPC not found, falling back to findActiveItem');
+        const existing = await this.findActiveItem(itemData.pantry_id, itemData.expiration_date, itemData.barcode, itemData.name);
+        if (existing) {
+          const updated = await this.updateItem(existing.id, { quantity: existing.quantity + (itemData.quantity ?? 1) });
+          return { item: updated, merged: true };
+        }
+        const created = await this.createItem(itemData);
+        return { item: created, merged: false };
       }
-      const created = await this.createItem(itemData);
-      return { item: created, merged: false };
+      throw new Error(`RPC merge_or_create_item failed: ${error.message}`);
+    }
+
+    if (!data || !data.item) {
+      throw new Error('RPC merge_or_create_item returned empty response');
     }
 
     return {
@@ -563,7 +636,19 @@ const db: DatabaseClient = {
       p_all: consumeAll,
     });
 
-    if (error || !data) {
+    if (error) {
+      const isNotFound =
+        error.code === '42883' ||
+        error.message?.includes('could not find the function') ||
+        error.message?.includes('does not exist');
+
+      if (isNotFound) {
+        return null;
+      }
+      throw new Error(`RPC consume_pantry_item failed: ${error.message}`);
+    }
+
+    if (!data) {
       return null;
     }
 

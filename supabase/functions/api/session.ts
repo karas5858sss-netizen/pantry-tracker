@@ -54,13 +54,30 @@ export async function handleSession(
   }
 
   // 4. Upsert user
-  const savedUser = await deps.db.upsertUser({
-    telegram_id: user.id,
-    first_name: user.first_name,
-    username: user.username || null,
-    language_code: user.language_code || 'ru',
-    timezone: clientTimezone,
-  });
+  let savedUser;
+  try {
+    savedUser = await deps.db.upsertUser({
+      telegram_id: user.id,
+      first_name: user.first_name,
+      username: user.username || null,
+      language_code: user.language_code || 'ru',
+      timezone: clientTimezone,
+    });
+  } catch (err: any) {
+    if (err?.code === 'USER_LIMIT_REACHED' || err?.message === 'USER_LIMIT_REACHED') {
+      return new Response(
+        JSON.stringify({
+          error: 'Превышен лимит пользователей проекта (максимум 10)',
+          code: 'USER_LIMIT_REACHED',
+        }),
+        {
+          status: 403,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+    }
+    throw err;
+  }
 
   if (user.allows_write_to_pm && !savedUser.can_write_pm) {
     await deps.db.updateCanWritePm(user.id, true);

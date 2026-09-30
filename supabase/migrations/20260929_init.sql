@@ -190,3 +190,103 @@ begin
   end if;
 end;
 $$;
+
+-- Atomic Register or Update User with strict 10-user limit
+create or replace function register_user_with_limit(
+  p_telegram_id bigint,
+  p_first_name text,
+  p_username text,
+  p_language_code text,
+  p_timezone text
+)
+returns jsonb
+language plpgsql
+security definer
+as $$
+declare
+  v_user users%rowtype;
+  v_count int;
+begin
+  -- If user already registered, update profile and return
+  select * into v_user from users where telegram_id = p_telegram_id;
+  if found then
+    update users
+    set first_name = p_first_name,
+        username = p_username,
+        language_code = coalesce(p_language_code, language_code),
+        timezone = coalesce(p_timezone, timezone)
+    where telegram_id = p_telegram_id
+    returning * into v_user;
+    return jsonb_build_object('user', to_jsonb(v_user), 'is_new', false);
+  end if;
+
+  -- Transaction-level advisory lock serializes concurrent new-user registrations
+  perform pg_advisory_xact_lock(737373);
+  select count(*) into v_count from users;
+  if v_count >= 10 then
+    return jsonb_build_object('error', 'USER_LIMIT_REACHED');
+  end if;
+
+  insert into users (telegram_id, first_name, username, language_code, timezone)
+  values (p_telegram_id, p_first_name, p_username, coalesce(p_language_code, 'ru'), coalesce(p_timezone, 'Europe/Moscow'))
+  returning * into v_user;
+
+  return jsonb_build_object('user', to_jsonb(v_user), 'is_new', true);
+end;
+$$;
+
+-- Atomic Join Pantry via Invite Code with row-level locking
+create or replace function join_pantry_via_invite(
+  p_code text,
+  p_user_id bigint
+)
+returns jsonb
+language plpgsql
+security definer
+as $$
+declare
+  v_invite pantry_invites%rowtype;
+  v_pantry pantries%rowtype;
+  v_member pantry_members%rowtype;
+begin
+  -- 1. Row lock the invite to prevent concurrent exhaustion races
+  select * into v_invite
+  from pantry_invites
+  where code = p_code
+  for update;
+
+  if not found then
+    return jsonb_build_object('error', 'INVITE_NOT_FOUND');
+  end if;
+
+  if v_invite.expires_at < now() then
+    return jsonb_build_object('error', 'INVITE_EXPIRED');
+  end if;
+
+  -- 2. Check if already a member
+  select * into v_member
+  from pantry_members
+  where pantry_id = v_invite.pantry_id and user_id = p_user_id;
+
+  if found then
+    select * into v_pantry from pantries where id = v_invite.pantry_id;
+    return jsonb_build_object('pantry', to_jsonb(v_pantry), 'already_member', true);
+  end if;
+
+  -- 3. Check remaining uses under row lock
+  if v_invite.uses >= v_invite.max_uses then
+    return jsonb_build_object('error', 'INVITE_EXHAUSTED');
+  end if;
+
+  -- 4. Atomically insert member and increment uses
+  insert into pantry_members (pantry_id, user_id, role)
+  values (v_invite.pantry_id, p_user_id, 'member');
+
+  update pantry_invites
+  set uses = uses + 1
+  where code = p_code;
+
+  select * into v_pantry from pantries where id = v_invite.pantry_id;
+  return jsonb_build_object('pantry', to_jsonb(v_pantry), 'already_member', false);
+end;
+$$;

@@ -1,13 +1,15 @@
 import React, { useRef, useState } from 'react';
 import { decodeFromFile, type BarcodeDetection } from '../barcodeReader.ts';
 import { triggerHaptic } from '../telegram.ts';
+import { t, type SupportedLanguage } from '@shared/i18n.ts';
 
 interface PhotoScannerProps {
+  lang?: SupportedLanguage;
   onDetected: (detection: BarcodeDetection) => void;
   onSwitchToManual: () => void;
 }
 
-export const PhotoScanner: React.FC<PhotoScannerProps> = ({ onDetected, onSwitchToManual }) => {
+export const PhotoScanner: React.FC<PhotoScannerProps> = ({ lang = 'ru', onDetected, onSwitchToManual }) => {
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
 
@@ -94,7 +96,7 @@ export const PhotoScanner: React.FC<PhotoScannerProps> = ({ onDetected, onSwitch
         {isProcessing && (
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center text-white">
             <div className="w-8 h-8 border-3 border-emerald-400 border-t-transparent rounded-full animate-spin mb-2" />
-            <span className="text-xs font-medium">Распознавание штрихкода...</span>
+            <span className="text-xs font-medium">{t(lang, 'scan_barcode_recognizing')}</span>
           </div>
         )}
       </div>
@@ -108,7 +110,7 @@ export const PhotoScanner: React.FC<PhotoScannerProps> = ({ onDetected, onSwitch
           className="flex items-center justify-center gap-1.5 py-3 px-4 bg-tg-button text-tg-button font-medium rounded-xl text-sm shadow-sm active:opacity-85 transition disabled:opacity-50"
         >
           <span>📷</span>
-          <span>Снять фото</span>
+          <span>{t(lang, 'scan_photo_take')}</span>
         </button>
 
         <button
@@ -118,7 +120,7 @@ export const PhotoScanner: React.FC<PhotoScannerProps> = ({ onDetected, onSwitch
           className="flex items-center justify-center gap-1.5 py-3 px-4 bg-tg-secondary text-tg-text font-medium rounded-xl text-sm border border-tg-hint/20 active:opacity-85 transition disabled:opacity-50"
         >
           <span>🖼️</span>
-          <span>Из галереи</span>
+          <span>{t(lang, 'scan_photo_gallery')}</span>
         </button>
       </div>
 
@@ -127,7 +129,7 @@ export const PhotoScanner: React.FC<PhotoScannerProps> = ({ onDetected, onSwitch
         <div className="w-full mt-3 p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-tg-text text-left">
           <p className="font-semibold text-amber-500 mb-1 flex items-center gap-1">
             <span>⚠️</span>
-            <span>Не удалось распознать</span>
+            <span>{t(lang, 'scan_photo_failed')}</span>
           </p>
           <p className="text-tg-hint leading-relaxed">{errorStatus}</p>
           <button

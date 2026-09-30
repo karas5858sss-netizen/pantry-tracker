@@ -414,7 +414,7 @@ export const OcrDateScannerModal: React.FC<OcrDateScannerModalProps> = ({
                   className="w-full py-3 px-4 rounded-xl bg-tg-button text-tg-button font-bold text-sm shadow-md active:scale-[0.98] transition flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                   <span>📸</span>
-                  <span>Сфотографировать и распознать</span>
+                  <span>{t(lang, 'ocr_snap_and_read')}</span>
                 </button>
               )}
             </div>
@@ -427,7 +427,7 @@ export const OcrDateScannerModal: React.FC<OcrDateScannerModalProps> = ({
                 {previewUrl ? (
                   <img
                     src={previewUrl}
-                    alt="Предпросмотр"
+                    alt={t(lang, 'mode_photo')}
                     className="w-full h-full object-contain"
                   />
                 ) : (
@@ -549,7 +549,7 @@ export const OcrDateScannerModal: React.FC<OcrDateScannerModalProps> = ({
                 <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-2 text-xs">
                   <p className="font-bold text-amber-500 flex items-center gap-1.5">
                     <span>⚠️</span>
-                    <span>Дата не найдена</span>
+                    <span>{t(lang, 'ocr_date_not_found')}</span>
                   </p>
                   <p className="text-tg-hint leading-relaxed">
                     {t(lang, 'ocr_no_candidates')}
@@ -565,11 +565,11 @@ export const OcrDateScannerModal: React.FC<OcrDateScannerModalProps> = ({
                     onClick={() => setShowRawText(!showRawText)}
                     className="text-[11px] text-tg-hint hover:text-tg-text flex items-center gap-1"
                   >
-                    <span>{showRawText ? '▼ Скрыть распознанный текст' : '▶ Показать распознанный текст'}</span>
+                    <span>{showRawText ? t(lang, 'ocr_hide_raw_text') : t(lang, 'ocr_show_raw_text')}</span>
                   </button>
                   {showRawText && (
                     <div className="mt-1 p-2 bg-tg-secondary rounded-lg border border-tg-hint/15 text-[10px] font-mono text-tg-hint whitespace-pre-wrap break-all max-h-24 overflow-y-auto">
-                      {rawText.trim() || '(пусто)'}
+                      {rawText.trim() || t(lang, 'ocr_empty_text')}
                     </div>
                   )}
                 </div>
@@ -600,7 +600,7 @@ export const OcrDateScannerModal: React.FC<OcrDateScannerModalProps> = ({
                     onClick={onClose}
                     className="flex-2 py-3 px-3 rounded-xl bg-tg-button text-tg-button font-bold text-xs transition shadow-md"
                   >
-                    Ввести дату вручную
+                    {t(lang, 'ocr_enter_manual')}
                   </button>
                 )}
               </div>

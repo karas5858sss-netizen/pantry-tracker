@@ -320,6 +320,18 @@ describe('Stage 2: Pantries, Sharing & Invites API', () => {
     expect(res.status).toBe(403);
   });
 
+  it('rejects invite creation by a pantry member who is not the owner with 403', async () => {
+    const pantry = await mockDb.createPantry('Alice Pantry', 1001);
+    // Add Bob as regular member
+    mockDb.membersList.push({ pantry_id: pantry.id, user_id: 1002, role: 'member', joined_at: new Date().toISOString() });
+
+    // Bob (member) tries to create an invite
+    const res = await makeAuthRequest(userB, 'POST', `/pantries/${pantry.id}/invites`);
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.error).toContain('Только владелец');
+  });
+
   it('allows second user to join pantry via valid invite code', async () => {
     const pantry = await mockDb.createPantry('Shared Pantry', 1001);
     const inviteRes = await makeAuthRequest(userA, 'POST', `/pantries/${pantry.id}/invites`);

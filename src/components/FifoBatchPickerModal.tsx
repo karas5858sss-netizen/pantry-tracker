@@ -108,7 +108,7 @@ export const FifoBatchPickerModal: React.FC<FifoBatchPickerModalProps> = ({
                     )}
                   </div>
                   <div className="flex items-center gap-2 text-[11px] text-tg-hint">
-                    <span>Остаток: <b>{item.quantity} шт.</b></span>
+                    <span>{t(lang, 'batch_remaining').replace('{qty}', String(item.quantity))}</span>
                     <span>•</span>
                     <span className={`px-1.5 py-0.2 rounded border text-[10px] font-semibold ${badgeColor}`}>
                       {statusText}

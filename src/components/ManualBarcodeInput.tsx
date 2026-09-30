@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import { validateEanInput, calculateEanCheckDigit } from '@shared/ean.ts';
 import { triggerHaptic } from '../telegram.ts';
 import type { BarcodeDetection } from '../barcodeReader.ts';
+import { t, type SupportedLanguage } from '@shared/i18n.ts';
 
 interface ManualBarcodeInputProps {
+  lang?: SupportedLanguage;
   onDetected: (detection: BarcodeDetection) => void;
 }
 
@@ -14,7 +16,7 @@ const SAMPLE_CODES = [
   { label: 'EAN-8', code: '40123455' },
 ];
 
-export const ManualBarcodeInput: React.FC<ManualBarcodeInputProps> = ({ onDetected }) => {
+export const ManualBarcodeInput: React.FC<ManualBarcodeInputProps> = ({ lang = 'ru', onDetected }) => {
   const [value, setValue] = useState('');
   const [submittedAttempt, setSubmittedAttempt] = useState(false);
 
@@ -93,7 +95,7 @@ export const ManualBarcodeInput: React.FC<ManualBarcodeInputProps> = ({ onDetect
           <div className="mt-3 min-h-[22px] text-xs">
             {digitsOnly.length > 0 && !validation.isValid && (
               <div className="flex items-center justify-between text-tg-hint">
-                <span>Введено цифр: {digitsOnly.length} (требуется 8 или 13)</span>
+                <span>{t(lang, 'digits_entered').replace('{count}', String(digitsOnly.length))}</span>
                 {pendingCheckDigit !== null && (
                   <button
                     type="button"

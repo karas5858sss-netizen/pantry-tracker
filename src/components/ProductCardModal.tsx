@@ -319,7 +319,7 @@ export const ProductCardModal: React.FC<ProductCardModalProps> = ({
                   />
                   {!product && (
                     <p className="text-[11px] text-amber-500 font-medium">
-                      ⚠️ Товар пока отсутствует в базе. Введите название — оно сохранится в каталоге!
+                      {t(lang, 'product_not_in_db_hint')}
                     </p>
                   )}
                 </div>
@@ -346,7 +346,7 @@ export const ProductCardModal: React.FC<ProductCardModalProps> = ({
               <div className="pt-2 flex items-center justify-between border-t border-tg-hint/15">
                 <div>
                   <div className="text-xs font-semibold text-tg-text">{t(lang, 'product_quantity_label')}</div>
-                  <div className="text-[10px] text-tg-hint">Количество единиц товара</div>
+                  <div className="text-[10px] text-tg-hint">{t(lang, 'product_quantity_hint')}</div>
                 </div>
 
                 <div className="flex items-center gap-3 bg-tg-secondary p-1.5 rounded-xl border border-tg-hint/15">
@@ -479,7 +479,7 @@ export const ProductCardModal: React.FC<ProductCardModalProps> = ({
                 {/* Selected Date Preview */}
                 {expirationDate && (
                   <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-between text-xs">
-                    <span className="text-tg-hint font-medium">Годен до:</span>
+                    <span className="text-tg-hint font-medium">{t(lang, 'product_expires_label')}</span>
                     <span className="font-bold text-emerald-500">
                       {formatPreviewDate(expirationDate)}
                     </span>

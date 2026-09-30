@@ -188,7 +188,7 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
                 <span>{t(lang, 'settings_reminders_enabled')}</span>
               </div>
               <div className="text-[11px] text-tg-hint mt-0.5">
-                {remindersEnabled ? 'Уведомления включены' : 'Уведомления отключены'}
+                {remindersEnabled ? t(lang, 'settings_reminders_on') : t(lang, 'settings_reminders_off')}
               </div>
             </div>
 
@@ -234,7 +234,7 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
           ) : (
             <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center gap-2 text-[11px] text-emerald-500 font-medium">
               <span>✓</span>
-              <span>Доступ к отправке сообщений в Telegram активен</span>
+              <span>{t(lang, 'settings_pm_access_active')}</span>
             </div>
           )}
 
@@ -384,7 +384,7 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
             {isSaving ? (
               <>
                 <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                <span>Сохранение...</span>
+                <span>{t(lang, 'settings_saving')}</span>
               </>
             ) : (
               <span>💾 {t(lang, 'settings_save')}</span>

@@ -265,7 +265,7 @@ export const App: React.FC = () => {
         <div className="w-full mb-4 p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-xl text-left text-xs">
           <div className="flex items-center gap-1.5 font-bold text-amber-500 mb-1">
             <span>⚠️</span>
-            <span>{sessionError.code === 'NOT_ALLOWED' ? 'Доступ ограничен' : 'Авторизация'}</span>
+            <span>{sessionError.code === 'NOT_ALLOWED' ? t(lang, 'access_restricted') : t(lang, 'auth_title')}</span>
           </div>
           <p className="text-tg-hint leading-relaxed">{sessionError.error}</p>
 
@@ -354,7 +354,7 @@ export const App: React.FC = () => {
         <div className="w-full space-y-3">
           {/* Scanner Mode Toggle: [+ Приход] vs [− Списание] */}
           <div className="w-full flex items-center justify-between p-1.5 bg-tg-secondary rounded-2xl border border-tg-hint/15">
-            <span className="text-[11px] font-semibold text-tg-hint pl-2">Действие:</span>
+            <span className="text-[11px] font-semibold text-tg-hint pl-2">{t(lang, 'action_menu')}</span>
             <div className="flex gap-1">
               <button
                 type="button"
@@ -464,12 +464,13 @@ export const App: React.FC = () => {
             )}
             {scanType === 'photo' && (
               <PhotoScanner
+                lang={lang}
                 onDetected={handleDetected}
                 onSwitchToManual={() => setScanType('manual')}
               />
             )}
             {scanType === 'manual' && (
-              <ManualBarcodeInput onDetected={handleDetected} />
+              <ManualBarcodeInput lang={lang} onDetected={handleDetected} />
             )}
           </main>
 
@@ -479,7 +480,7 @@ export const App: React.FC = () => {
               <div className="flex items-center justify-between">
                 <span className="font-bold text-tg-text flex items-center gap-1.5">
                   <span>{currentResult.isValidEan ? '✅' : 'ℹ️'}</span>
-                  <span>{currentResult.isValidEan ? 'EAN OK' : 'Штрихкод'}</span>
+                  <span>{currentResult.isValidEan ? 'EAN OK' : t(lang, 'mode_manual')}</span>
                 </span>
                 <span className="font-mono text-xs font-bold text-tg-button">{currentResult.text}</span>
               </div>
