@@ -143,3 +143,101 @@ describe('Database Smoke-Test: RLS Enforcement with Public Anon Key', () => {
     });
   }
 });
+
+/**
+ * RPC Security Guard: SECURITY DEFINER functions must NOT be callable via anon key.
+ *
+ * These functions are restricted to service_role only via:
+ *   REVOKE EXECUTE FROM public, anon, authenticated;
+ *   GRANT EXECUTE TO service_role;
+ *
+ * PostgREST should return 401 (no permission), 403, or 404 (function not exposed
+ * in the PostgREST schema cache after REVOKE).
+ */
+interface RpcTestCase {
+  name: string;
+  params: Record<string, unknown>;
+}
+
+const SECURITY_DEFINER_RPCS: RpcTestCase[] = [
+  {
+    name: 'consume_pantry_item',
+    params: {
+      p_item_id: '00000000-0000-0000-0000-000000000000',
+      p_action: 'consumed',
+      p_all: false,
+    },
+  },
+  {
+    name: 'merge_or_create_item',
+    params: {
+      p_pantry_id: '00000000-0000-0000-0000-000000000000',
+      p_barcode: '0000000000000',
+      p_name: 'Hacker Item',
+      p_expiration_date: '2099-01-01',
+      p_quantity: 1,
+      p_created_by: 999999999,
+    },
+  },
+  {
+    name: 'register_user_with_limit',
+    params: {
+      p_telegram_id: 999999999,
+      p_first_name: 'Hacker',
+      p_username: 'hacker',
+      p_language_code: 'en',
+      p_timezone: 'UTC',
+    },
+  },
+  {
+    name: 'join_pantry_via_invite',
+    params: {
+      p_code: 'fake_invite_code_1234567',
+      p_user_id: 999999999,
+    },
+  },
+  {
+    name: 'create_pantry_with_owner',
+    params: {
+      p_name: 'Hacker Pantry',
+      p_owner_id: 999999999,
+    },
+  },
+];
+
+describe('RPC Security Guard: SECURITY DEFINER functions blocked for anon', () => {
+  for (const { name, params } of SECURITY_DEFINER_RPCS) {
+    it(`rejects anon call to RPC "${name}" (permission denied)`, async () => {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${name}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify(params),
+      });
+
+      // After REVOKE EXECUTE, PostgREST returns one of:
+      //   401 - permission denied for function
+      //   403 - forbidden
+      //   404 - function not found in schema cache (revoked functions disappear from PostgREST)
+      const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+
+      const isBlocked =
+        res.status === 401 ||
+        res.status === 403 ||
+        res.status === 404 ||
+        body.code === '42501' ||
+        (typeof body.message === 'string' &&
+          (body.message.includes('permission denied') ||
+           body.message.includes('Could not find')));
+
+      expect(
+        isBlocked,
+        `Expected RPC "${name}" to be blocked for anon key, ` +
+        `but got status ${res.status}: ${JSON.stringify(body)}`
+      ).toBe(true);
+    });
+  }
+});

@@ -13,6 +13,8 @@ describe('RLS Guard Tests', () => {
   });
 
   it('ensures every created table in migrations has Row Level Security explicitly enabled', () => {
+    let totalTablesFound = 0;
+
     for (const sqlFile of sqlFiles) {
       const content = fs.readFileSync(path.join(migrationsDir, sqlFile), 'utf-8');
 
@@ -22,7 +24,13 @@ describe('RLS Guard Tests', () => {
       ];
       const createdTables = tableMatches.map((m) => m[1].toLowerCase());
 
-      expect(createdTables.length).toBeGreaterThan(0);
+      // Not every migration creates tables (e.g. security-hardening REVOKE/GRANT only).
+      // Skip those, but still verify RLS for migrations that do create tables.
+      if (createdTables.length === 0) {
+        continue;
+      }
+
+      totalTablesFound += createdTables.length;
 
       for (const table of createdTables) {
         const rlsRegex = new RegExp(
@@ -36,6 +44,9 @@ describe('RLS Guard Tests', () => {
         ).toBe(true);
       }
     }
+
+    // At least one migration must define tables (sanity check)
+    expect(totalTablesFound).toBeGreaterThan(0);
   });
 
   it('ensures no client RLS policies are created (zero policies rule)', () => {
