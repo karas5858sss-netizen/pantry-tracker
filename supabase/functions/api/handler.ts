@@ -12,6 +12,7 @@ import {
   handleUpdateWriteAccess,
 } from './pantries.ts';
 import { handleGetProduct, handleUpsertProduct } from './products.ts';
+import { handleCreateItem, handleGetPantryItems } from './items.ts';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -139,6 +140,21 @@ export async function handleApiRequest(req: Request, deps: ApiDependencies): Pro
   if (getMembersMatch && req.method === 'GET') {
     const pantryId = getMembersMatch[1];
     const res = await handleGetMembers(user, pantryId, deps);
+    return addCors(res);
+  }
+
+  // Route: POST /pantries/:id/items (add item to pantry with expiration date)
+  const itemsMatch = pathname.match(/^\/pantries\/([^/]+)\/items$/);
+  if (itemsMatch && req.method === 'POST') {
+    const pantryId = itemsMatch[1];
+    const res = await handleCreateItem(user, pantryId, req, deps);
+    return addCors(res);
+  }
+
+  // Route: GET /pantries/:id/items (list items of pantry)
+  if (itemsMatch && req.method === 'GET') {
+    const pantryId = itemsMatch[1];
+    const res = await handleGetPantryItems(user, pantryId, req, deps);
     return addCors(res);
   }
 

@@ -15,6 +15,8 @@ import type {
   InviteRecord,
   PantryMemberRecord,
   ProductRecord,
+  ItemRecord,
+  CreateItemData,
 } from './types.ts';
 import {
   getOffApiUrl,
@@ -347,6 +349,42 @@ const db: DatabaseClient = {
       throw new Error(`Failed to upsert product: ${error.message}`);
     }
     return data;
+  },
+
+  async createItem(itemData: CreateItemData): Promise<ItemRecord> {
+    const { data, error } = await supabase
+      .from('items')
+      .insert({
+        pantry_id: itemData.pantry_id,
+        barcode: itemData.barcode ?? null,
+        name: itemData.name,
+        expiration_date: itemData.expiration_date,
+        quantity: itemData.quantity ?? 1,
+        status: 'active',
+        created_by: itemData.created_by,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      throw new Error(`Failed to create item: ${error.message}`);
+    }
+    return data;
+  },
+
+  async getPantryItems(pantryId: string, status: 'active' | 'consumed' | 'discarded' = 'active'): Promise<ItemRecord[]> {
+    const { data, error } = await supabase
+      .from('items')
+      .select('*')
+      .eq('pantry_id', pantryId)
+      .eq('status', status)
+      .order('expiration_date', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching pantry items:', error);
+      return [];
+    }
+    return data ?? [];
   },
 };
 

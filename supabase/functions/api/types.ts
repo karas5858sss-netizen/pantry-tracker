@@ -79,6 +79,32 @@ export interface DatabaseClient {
   // Stage 3: Products resolution and catalog
   getProduct: (barcode: string) => Promise<ProductRecord | null>;
   upsertProduct: (barcode: string, name: string, source: 'manual' | 'off') => Promise<ProductRecord>;
+
+  // Stage 4: Items & Expiration dates
+  createItem: (item: CreateItemData) => Promise<ItemRecord>;
+  getPantryItems: (pantryId: string, status?: 'active' | 'consumed' | 'discarded') => Promise<ItemRecord[]>;
+}
+
+export interface ItemRecord {
+  id: string;
+  pantry_id: string;
+  barcode: string | null;
+  name: string;
+  expiration_date: string;
+  quantity: number;
+  status: 'active' | 'consumed' | 'discarded';
+  created_by: number;
+  created_at: string;
+  closed_at: string | null;
+}
+
+export interface CreateItemData {
+  pantry_id: string;
+  barcode?: string | null;
+  name: string;
+  expiration_date: string;
+  quantity?: number;
+  created_by: number;
 }
 
 export interface ProductRecord {

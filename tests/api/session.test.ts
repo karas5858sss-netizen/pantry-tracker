@@ -8,6 +8,8 @@ import type {
   PantryRecord,
   UpsertUserData,
   SessionResponse,
+  CreateItemData,
+  ItemRecord,
 } from '../../supabase/functions/api/types.ts';
 
 const TEST_BOT_TOKEN = '123456789:ABCDEF_mock_bot_token_for_tests';
@@ -114,6 +116,12 @@ function createMockDb(): DatabaseClient & {
     },
     async upsertProduct(barcode: string, name: string, source: 'manual' | 'off') {
       return { barcode, name, source, updated_at: new Date().toISOString() };
+    },
+    async createItem(_item: CreateItemData): Promise<ItemRecord> {
+      throw new Error('Not implemented in session tests');
+    },
+    async getPantryItems(_pantryId: string, _status?: 'active' | 'consumed' | 'discarded'): Promise<ItemRecord[]> {
+      return [];
     },
   };
 }

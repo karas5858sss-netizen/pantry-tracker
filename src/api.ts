@@ -299,3 +299,50 @@ export async function saveProduct(
   });
 }
 
+// Stage 4: Pantry Items & Expiration Dates
+
+export interface PantryItem {
+  id: string;
+  pantry_id: string;
+  barcode: string | null;
+  name: string;
+  expiration_date: string;
+  quantity: number;
+  status: 'active' | 'consumed' | 'discarded';
+  created_by: number;
+  created_at: string;
+  closed_at: string | null;
+}
+
+export interface CreateItemPayload {
+  name: string;
+  expiration_date: string;
+  barcode?: string | null;
+  quantity?: number;
+}
+
+/**
+ * Adds an item with expiration date to a pantry.
+ */
+export async function createItem(
+  pantryId: string,
+  payload: CreateItemPayload
+): Promise<{ data?: { item: PantryItem }; error?: ApiError }> {
+  return requestApi<{ item: PantryItem }>(`/pantries/${pantryId}/items`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+/**
+ * Fetches items from a pantry.
+ */
+export async function getPantryItems(
+  pantryId: string,
+  status: 'active' | 'consumed' | 'discarded' = 'active'
+): Promise<{ data?: { items: PantryItem[] }; error?: ApiError }> {
+  return requestApi<{ items: PantryItem[] }>(`/pantries/${pantryId}/items?status=${status}`, {
+    method: 'GET',
+  });
+}
+

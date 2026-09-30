@@ -88,6 +88,21 @@ export const translations = {
     product_searching: 'Поиск товара в базе...',
     product_saved_toast: 'Товар сохранен в каталог!',
 
+    // Stage 4: Expiration dates & Presets
+    exp_date_label: 'Срок годности',
+    exp_preset_3d: '+3 дня',
+    exp_preset_7d: '+7 дней',
+    exp_preset_1m: '+1 месяц',
+    exp_preset_6m: '+6 месяцев',
+    exp_month_year_mode: 'ММ/ГГГГ',
+    exp_month_year_hint: 'Конец месяца (например 10.2026)',
+    exp_exact_date_mode: 'Точная дата',
+    exp_invalid_date: 'Укажите корректный срок годности',
+    item_add_btn: 'Добавить на склад',
+    item_adding: 'Добавление...',
+    item_added_toast: 'Товар успешно добавлен на склад!',
+    item_no_pantry: 'Сначала выберите или создайте склад',
+
     // Common
     btn_retry: 'Повторить',
     btn_copy: 'Копировать',
@@ -177,6 +192,21 @@ export const translations = {
     product_searching: 'Buscando producto...',
     product_saved_toast: '¡Producto guardado en el catálogo!',
 
+    // Stage 4: Expiration dates & Presets
+    exp_date_label: 'Fecha de caducidad',
+    exp_preset_3d: '+3 días',
+    exp_preset_7d: '+7 días',
+    exp_preset_1m: '+1 mes',
+    exp_preset_6m: '+6 meses',
+    exp_month_year_mode: 'MM/AAAA',
+    exp_month_year_hint: 'Fin de mes (ej. 10.2026)',
+    exp_exact_date_mode: 'Fecha exacta',
+    exp_invalid_date: 'Indique una fecha de caducidad válida',
+    item_add_btn: 'Añadir a la despensa',
+    item_adding: 'Añadiendo...',
+    item_added_toast: '¡Producto añadido a la despensa!',
+    item_no_pantry: 'Primero selecciona o crea una despensa',
+
     // Common
     btn_retry: 'Reintentar',
     btn_copy: 'Copiar',
@@ -265,6 +295,21 @@ export const translations = {
     product_edit_name: 'Edit',
     product_searching: 'Searching product...',
     product_saved_toast: 'Product saved to catalog!',
+
+    // Stage 4: Expiration dates & Presets
+    exp_date_label: 'Expiration date',
+    exp_preset_3d: '+3 days',
+    exp_preset_7d: '+7 days',
+    exp_preset_1m: '+1 month',
+    exp_preset_6m: '+6 months',
+    exp_month_year_mode: 'MM/YYYY',
+    exp_month_year_hint: 'End of month (e.g. 10.2026)',
+    exp_exact_date_mode: 'Exact date',
+    exp_invalid_date: 'Please enter a valid expiration date',
+    item_add_btn: 'Add to pantry',
+    item_adding: 'Adding...',
+    item_added_toast: 'Item successfully added to pantry!',
+    item_no_pantry: 'Please select or create a pantry first',
 
     // Common
     btn_retry: 'Retry',

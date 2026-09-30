@@ -133,7 +133,7 @@ export const App: React.FC = () => {
         </div>
         <div className="flex items-center gap-1.5">
           <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 font-semibold">
-            Stage 3
+            Stage 4
           </span>
         </div>
       </header>
@@ -418,7 +418,13 @@ export const App: React.FC = () => {
           barcode={selectedProductBarcode}
           format={currentResult?.format}
           lang={lang}
+          currentPantryId={currentPantry?.id}
           onClose={() => setIsProductModalOpen(false)}
+          onItemAdded={(item) => {
+            setToastMessage(`✓ «${item.name}» (${item.quantity} шт.) добавлен на склад (до ${item.expiration_date})!`);
+            triggerHaptic('success');
+            setTimeout(() => setToastMessage(null), 3500);
+          }}
           onProductConfirmed={(p) => {
             setToastMessage(`✓ Товар «${p.name}» (${p.quantity} шт.) подтвержден!`);
             setTimeout(() => setToastMessage(null), 3500);
