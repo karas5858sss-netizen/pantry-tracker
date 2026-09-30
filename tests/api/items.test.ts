@@ -460,6 +460,13 @@ describe('Stage 4: Items & Expiration Dates API', () => {
         expect(data.item.closed_at).toBe(fixedNow.toISOString());
       });
 
+      it('also supports /consumed alias for backwards/frontend compatibility', async () => {
+        const res = await makeAuthRequest(ownerUser, 'POST', `/pantries/pantry-1/items/${itemSingleQty.id}/consumed`);
+        expect(res.status).toBe(200);
+        const data = await res.json();
+        expect(data.item.status).toBe('consumed');
+      });
+
       it('closes item with status discarded when discarded', async () => {
         const res = await makeAuthRequest(ownerUser, 'POST', `/pantries/pantry-1/items/${itemSingleQty.id}/discard`);
         expect(res.status).toBe(200);
@@ -467,6 +474,13 @@ describe('Stage 4: Items & Expiration Dates API', () => {
         expect(data.item.id).toBe(itemSingleQty.id);
         expect(data.item.status).toBe('discarded');
         expect(data.item.closed_at).toBe(fixedNow.toISOString());
+      });
+
+      it('also supports /discarded alias for backwards/frontend compatibility', async () => {
+        const res = await makeAuthRequest(ownerUser, 'POST', `/pantries/pantry-1/items/${itemSingleQty.id}/discarded`);
+        expect(res.status).toBe(200);
+        const data = await res.json();
+        expect(data.item.status).toBe('discarded');
       });
 
       it('restores previously consumed item back to active (Undo operation)', async () => {

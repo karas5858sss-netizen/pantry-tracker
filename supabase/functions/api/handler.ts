@@ -158,7 +158,7 @@ export async function handleApiRequest(req: Request, deps: ApiDependencies): Pro
   }
 
   // Route: POST /pantries/:id/items/:itemId/consume (manual consume)
-  const consumeItemMatch = pathname.match(/^\/pantries\/([^/]+)\/items\/([^/]+)\/consume$/);
+  const consumeItemMatch = pathname.match(/^\/pantries\/([^/]+)\/items\/([^/]+)\/consume(d)?$/);
   if (consumeItemMatch && req.method === 'POST') {
     const pantryId = consumeItemMatch[1];
     const itemId = consumeItemMatch[2];
@@ -167,7 +167,7 @@ export async function handleApiRequest(req: Request, deps: ApiDependencies): Pro
   }
 
   // Route: POST /pantries/:id/items/:itemId/discard (manual discard)
-  const discardItemMatch = pathname.match(/^\/pantries\/([^/]+)\/items\/([^/]+)\/discard$/);
+  const discardItemMatch = pathname.match(/^\/pantries\/([^/]+)\/items\/([^/]+)\/discard(ed)?$/);
   if (discardItemMatch && req.method === 'POST') {
     const pantryId = discardItemMatch[1];
     const itemId = discardItemMatch[2];

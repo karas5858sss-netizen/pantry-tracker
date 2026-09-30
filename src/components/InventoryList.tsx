@@ -75,6 +75,12 @@ export const InventoryList: React.FC<InventoryListProps> = ({
     const res = await consumeItem(pantryId, item.id, action);
     setActionInProgressId(null);
 
+    if (res.error) {
+      triggerHaptic('error');
+      alert(res.error.error || 'Ошибка списания товара');
+      return;
+    }
+
     if (res.data) {
       // Update local state immediately for snappy feel
       if (res.data.item.status !== 'active') {
@@ -104,6 +110,12 @@ export const InventoryList: React.FC<InventoryListProps> = ({
     setUndoState(null);
 
     const res = await restoreItem(pantryId, item.id, previousState);
+    if (res.error) {
+      triggerHaptic('error');
+      alert(res.error.error || 'Ошибка отмены списания');
+      return;
+    }
+
     if (res.data?.item) {
       triggerHaptic('success');
       loadItems();

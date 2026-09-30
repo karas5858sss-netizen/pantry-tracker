@@ -377,7 +377,8 @@ export async function consumeItem(
   action: 'consumed' | 'discarded' = 'consumed',
   all: boolean = false
 ): Promise<{ data?: ConsumeItemResponse; error?: ApiError }> {
-  return requestApi<ConsumeItemResponse>(`/pantries/${pantryId}/items/${itemId}/${action}`, {
+  const verb = action === 'consumed' ? 'consume' : 'discard';
+  return requestApi<ConsumeItemResponse>(`/pantries/${pantryId}/items/${itemId}/${verb}`, {
     method: 'POST',
     body: JSON.stringify({ all }),
   });
