@@ -22,25 +22,6 @@ export async function handleSession(
     );
   }
 
-  // 2. Check if user already registered
-  const existingUser = await deps.db.getUser(user.id);
-
-  if (!existingUser) {
-    // New user registration - verify 10 user limit
-    const currentUsersCount = await deps.db.getUsersCount();
-    if (currentUsersCount >= 10) {
-      return new Response(
-        JSON.stringify({
-          error: 'Превышен лимит пользователей проекта (максимум 10)',
-          code: 'USER_LIMIT_REACHED',
-        }),
-        {
-          status: 403,
-          headers: { 'Content-Type': 'application/json' },
-        }
-      );
-    }
-  }
 
   // 3. Parse optional client timezone from request body
   let clientTimezone = 'Europe/Moscow';

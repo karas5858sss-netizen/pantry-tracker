@@ -1,13 +1,15 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { decodeFromCanvas, type BarcodeDetection } from '../barcodeReader.ts';
 import { triggerHaptic, playScanBeep } from '../telegram.ts';
+import { t, type SupportedLanguage } from '../../shared/i18n.ts';
 
 interface LiveScannerProps {
+  lang?: SupportedLanguage;
   onDetected: (detection: BarcodeDetection) => void;
   onSwitchToPhoto: () => void;
 }
 
-export const LiveScanner: React.FC<LiveScannerProps> = ({ onDetected, onSwitchToPhoto }) => {
+export const LiveScanner: React.FC<LiveScannerProps> = ({ lang = 'ru', onDetected, onSwitchToPhoto }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -68,7 +70,7 @@ export const LiveScanner: React.FC<LiveScannerProps> = ({ onDetected, onSwitchTo
     setErrorMessage(null);
 
     if (!navigator.mediaDevices?.getUserMedia) {
-      setErrorMessage('Камера не поддерживается в данном браузере или среде');
+      setErrorMessage(t(lang, 'scanner_unsupported'));
       return;
     }
 
@@ -110,11 +112,11 @@ export const LiveScanner: React.FC<LiveScannerProps> = ({ onDetected, onSwitchTo
       console.error('Camera access error:', err);
       const e = err as Error;
       if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') {
-        setErrorMessage('Доступ к камере отклонен. Разрешите доступ в настройках Telegram или переключитесь на режим фото.');
+        setErrorMessage(t(lang, 'scanner_permission_denied'));
       } else if (e.name === 'NotFoundError' || e.name === 'DevicesNotFoundError') {
-        setErrorMessage('Камера не найдена на этом устройстве.');
+        setErrorMessage(t(lang, 'scanner_device_not_found'));
       } else {
-        setErrorMessage(`Ошибка запуска камеры: ${e.message || 'Неизвестная ошибка'}`);
+        setErrorMessage(t(lang, 'scanner_camera_launch_error', { error: e.message || '' }));
       }
     }
   }, [stopStream]);
@@ -282,12 +284,12 @@ export const LiveScanner: React.FC<LiveScannerProps> = ({ onDetected, onSwitchTo
                   {activeBadge.text}
                 </div>
                 <div className="text-[10px] text-neutral-300">
-                  {activeBadge.format} • Контрольная сумма верна
+                  {activeBadge.format} • {t(lang, 'barcode_checksum_valid')}
                 </div>
               </div>
             </div>
             <span className="text-[10px] uppercase font-semibold px-2 py-0.5 bg-emerald-500/30 text-emerald-200 rounded">
-              Считано!
+              {t(lang, 'barcode_read')}
             </span>
           </div>
         )}
@@ -310,7 +312,7 @@ export const LiveScanner: React.FC<LiveScannerProps> = ({ onDetected, onSwitchTo
             className={`absolute top-2.5 right-2.5 p-2 rounded-full backdrop-blur-md transition ${
               torchOn ? 'bg-amber-400 text-black' : 'bg-black/60 text-white hover:bg-black/80'
             }`}
-            title="Фонарик"
+            title={t(lang, 'btn_torch')}
           >
             🔦
           </button>
@@ -327,14 +329,14 @@ export const LiveScanner: React.FC<LiveScannerProps> = ({ onDetected, onSwitchTo
                 onClick={startCamera}
                 className="px-4 py-2 bg-neutral-700 hover:bg-neutral-600 text-white rounded-lg text-xs font-semibold"
               >
-                Повторить
+                {t(lang, 'btn_retry')}
               </button>
               <button
                 type="button"
                 onClick={onSwitchToPhoto}
                 className="px-4 py-2 bg-tg-button text-tg-button rounded-lg text-xs font-semibold"
               >
-                Режим фото
+                {t(lang, 'mode_photo')}
               </button>
             </div>
           </div>
@@ -351,7 +353,7 @@ export const LiveScanner: React.FC<LiveScannerProps> = ({ onDetected, onSwitchTo
           }}
           className="text-tg-hint hover:text-tg-text flex items-center gap-1 font-medium transition"
         >
-          {isScanning ? '⏸ Приостановить поток' : '▶️ Возобновить поток'}
+          {isScanning ? `⏸ ${t(lang, 'scanner_pause')}` : `▶️ ${t(lang, 'scanner_resume')}`}
         </button>
 
         <button
@@ -362,7 +364,7 @@ export const LiveScanner: React.FC<LiveScannerProps> = ({ onDetected, onSwitchTo
           }}
           className="text-tg-link hover:underline font-medium"
         >
-          🔄 Перезапустить камеру
+          🔄 {t(lang, 'scanner_restart')}
         </button>
       </div>
     </div>

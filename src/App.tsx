@@ -151,7 +151,7 @@ export const App: React.FC = () => {
         triggerHaptic('heavy');
       } else if (res.data.item) {
         triggerHaptic('success');
-        setToastMessage(`✓ «${res.data.item.name}» списан (-1 шт.)!`);
+        setToastMessage(t(lang, 'toast_item_consumed', { name: res.data.item.name }));
         setTimeout(() => setToastMessage(null), 3500);
         setInventoryRefreshKey((k) => k + 1);
       }
@@ -168,7 +168,7 @@ export const App: React.FC = () => {
 
     if (res.data?.item) {
       triggerHaptic('success');
-      setToastMessage(`✓ «${res.data.item.name}» списан (-1 шт.)!`);
+      setToastMessage(t(lang, 'toast_item_consumed', { name: res.data.item.name }));
       setTimeout(() => setToastMessage(null), 3500);
       setInventoryRefreshKey((k) => k + 1);
     }
@@ -271,7 +271,7 @@ export const App: React.FC = () => {
 
           {tgUser?.id && (
             <div className="mt-2 p-2 bg-black/10 dark:bg-white/5 rounded-lg font-mono text-[11px] text-tg-text">
-              Ваш Telegram ID: <span className="font-bold select-all">{tgUser.id}</span>
+              {t(lang, 'auth_your_telegram_id')} <span className="font-bold select-all">{tgUser.id}</span>
             </div>
           )}
 
@@ -458,6 +458,7 @@ export const App: React.FC = () => {
           <main className="w-full">
             {scanType === 'live' && (
               <LiveScanner
+                lang={lang}
                 onDetected={handleDetected}
                 onSwitchToPhoto={() => setScanType('photo')}
               />
@@ -571,14 +572,14 @@ export const App: React.FC = () => {
             setPrefilledOcrDate(null);
           }}
           onItemAdded={(item) => {
-            setToastMessage(`✓ «${item.name}» (${item.quantity} шт.) добавлен на склад (до ${item.expiration_date})!`);
+            setToastMessage(t(lang, 'toast_item_added', { name: item.name, qty: item.quantity, exp: item.expiration_date }));
             triggerHaptic('success');
             setPrefilledOcrDate(null);
             setTimeout(() => setToastMessage(null), 3500);
             setInventoryRefreshKey((k) => k + 1);
           }}
           onProductConfirmed={(p) => {
-            setToastMessage(`✓ Товар «${p.name}» (${p.quantity} шт.) подтвержден!`);
+            setToastMessage(t(lang, 'toast_product_confirmed', { name: p.name, qty: p.quantity }));
             setPrefilledOcrDate(null);
             setTimeout(() => setToastMessage(null), 3500);
           }}
@@ -617,7 +618,7 @@ export const App: React.FC = () => {
         onClose={() => setIsMainOcrOpen(false)}
         onDateSelected={(dateIso) => {
           setPrefilledOcrDate(dateIso);
-          setToastMessage(`✓ Срок годности ${dateIso} сохранён. Теперь отсканируйте товар!`);
+          setToastMessage(t(lang, 'toast_ocr_date_saved', { date: dateIso }));
           triggerHaptic('success');
           setTimeout(() => setToastMessage(null), 4000);
         }}

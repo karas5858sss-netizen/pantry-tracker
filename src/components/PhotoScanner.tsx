@@ -33,12 +33,12 @@ export const PhotoScanner: React.FC<PhotoScannerProps> = ({ lang = 'ru', onDetec
         onDetected(detection);
       } else {
         triggerHaptic('warning');
-        setErrorStatus('Штрихкод на фотографии не обнаружен. Попробуйте сфотографировать ближе, при хорошем освещении или ввести вручную.');
+        setErrorStatus(t(lang, 'scanner_not_found'));
       }
     } catch (err) {
       console.error('Photo processing failed:', err);
       triggerHaptic('error');
-      setErrorStatus('Ошибка при обработке изображения. Попробуйте другое фото.');
+      setErrorStatus(t(lang, 'scanner_error'));
     } finally {
       setIsProcessing(false);
     }
@@ -77,17 +77,17 @@ export const PhotoScanner: React.FC<PhotoScannerProps> = ({ lang = 'ru', onDetec
         {previewUrl ? (
           <img
             src={previewUrl}
-            alt="Снимок товара"
+            alt={t(lang, 'mode_photo')}
             className="w-full h-full object-contain rounded-xl"
           />
         ) : (
           <div className="flex flex-col items-center p-4">
             <div className="text-4xl mb-3">📸</div>
             <p className="text-sm font-medium text-tg-text mb-1">
-              Сделайте чёткий снимок штрихкода
+              {t(lang, 'scanner_photo_prompt')}
             </p>
             <p className="text-xs text-tg-hint">
-              Запасной режим при трудностях с живым видеопотоком
+              {t(lang, 'scanner_photo_subtitle')}
             </p>
           </div>
         )}
@@ -137,7 +137,7 @@ export const PhotoScanner: React.FC<PhotoScannerProps> = ({ lang = 'ru', onDetec
             onClick={onSwitchToManual}
             className="mt-2 text-tg-link font-medium hover:underline block"
           >
-            → Ввести цифры штрихкода вручную
+            {t(lang, 'scan_photo_switch_manual')}
           </button>
         </div>
       )}

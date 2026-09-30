@@ -122,7 +122,7 @@ export const ProductCardModal: React.FC<ProductCardModalProps> = ({
     e.preventDefault();
     const cleanName = productName.trim();
     if (!cleanName) {
-      setErrorMsg('Введите название товара');
+      setErrorMsg(t(lang, 'error_enter_product_name'));
       triggerHaptic('error');
       nameInputRef.current?.focus();
       return;
@@ -173,7 +173,7 @@ export const ProductCardModal: React.FC<ProductCardModalProps> = ({
         onClose();
         return;
       } else {
-        setErrorMsg(addRes.error?.error || 'Не удалось добавить товар на склад');
+        setErrorMsg(addRes.error?.error || t(lang, 'error_add_item_to_pantry'));
         triggerHaptic('error');
         return;
       }
@@ -195,7 +195,7 @@ export const ProductCardModal: React.FC<ProductCardModalProps> = ({
       }
       onClose();
     } else {
-      setErrorMsg(saveRes.error?.error || 'Не удалось сохранить товар');
+      setErrorMsg(saveRes.error?.error || t(lang, 'error_save_product'));
       triggerHaptic('error');
     }
   };
@@ -466,7 +466,7 @@ export const ProductCardModal: React.FC<ProductCardModalProps> = ({
                       type="text"
                       value={monthYearInput}
                       onChange={(e) => handleMonthYearChange(e.target.value)}
-                      placeholder="ММ/ГГГГ (напр. 10.2026)"
+                      placeholder={t(lang, 'date_month_year_placeholder')}
                       className="w-full p-2.5 rounded-xl bg-tg-secondary border border-tg-hint/25 text-tg-text text-sm focus:outline-none focus:ring-2 focus:ring-tg-button"
                     />
                     <p className="text-[10px] text-tg-hint flex items-center gap-1">

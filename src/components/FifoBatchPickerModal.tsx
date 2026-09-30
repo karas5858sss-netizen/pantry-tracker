@@ -69,7 +69,7 @@ export const FifoBatchPickerModal: React.FC<FifoBatchPickerModalProps> = ({
         {/* Batches list */}
         <div className="p-4 space-y-2.5 overflow-y-auto">
           <p className="text-xs text-tg-hint mb-1">
-            На складе найдено несколько партий с разными сроками. Выберите, какую списать:
+            {t(lang, 'fifo_picker_prompt')}
           </p>
 
           {items.map((item, index) => {
@@ -81,10 +81,10 @@ export const FifoBatchPickerModal: React.FC<FifoBatchPickerModalProps> = ({
 
             if (freshness.status === 'expired') {
               badgeColor = 'bg-red-500/15 text-red-500 border-red-500/25';
-              statusText = `${t(lang, 'freshness_expired')} (${Math.abs(freshness.daysRemaining)} дн.)`;
+              statusText = `${t(lang, 'freshness_expired')} (${Math.abs(freshness.daysRemaining)} ${t(lang, 'days_short')})`;
             } else if (freshness.status === 'warning') {
               badgeColor = 'bg-amber-500/15 text-amber-500 border-amber-500/25';
-              statusText = freshness.daysRemaining === 0 ? t(lang, 'freshness_today') : `${freshness.daysRemaining} дн.`;
+              statusText = freshness.daysRemaining === 0 ? t(lang, 'freshness_today') : `${freshness.daysRemaining} ${t(lang, 'days_short')}`;
             }
 
             return (

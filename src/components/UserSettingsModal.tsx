@@ -13,20 +13,20 @@ interface UserSettingsModalProps {
 }
 
 const COMMON_TIMEZONES = [
-  { value: 'Europe/Moscow', label: 'Москва (UTC+3)' },
-  { value: 'Europe/Kaliningrad', label: 'Калининград (UTC+2)' },
-  { value: 'Europe/Samara', label: 'Самара (UTC+4)' },
-  { value: 'Asia/Yekaterinburg', label: 'Екатеринбург (UTC+5)' },
-  { value: 'Asia/Omsk', label: 'Омск (UTC+6)' },
-  { value: 'Asia/Novosibirsk', label: 'Новосибирск (UTC+7)' },
-  { value: 'Asia/Krasnoyarsk', label: 'Красноярск (UTC+7)' },
-  { value: 'Asia/Irkutsk', label: 'Иркутск (UTC+8)' },
-  { value: 'Asia/Vladivostok', label: 'Владивосток (UTC+10)' },
-  { value: 'Europe/Madrid', label: 'Мадрид / Испания (CET/CEST)' },
-  { value: 'Europe/London', label: 'Лондон (GMT/BST)' },
-  { value: 'Europe/Berlin', label: 'Берлин / Париж (CET/CEST)' },
-  { value: 'America/New_York', label: 'Нью-Йорк (EST/EDT)' },
-  { value: 'America/Los_Angeles', label: 'Лос-Анджелес (PST/PDT)' },
+  { value: 'Europe/Moscow', label: 'Moscow (UTC+3)' },
+  { value: 'Europe/Kaliningrad', label: 'Kaliningrad (UTC+2)' },
+  { value: 'Europe/Samara', label: 'Samara (UTC+4)' },
+  { value: 'Asia/Yekaterinburg', label: 'Yekaterinburg (UTC+5)' },
+  { value: 'Asia/Omsk', label: 'Omsk (UTC+6)' },
+  { value: 'Asia/Novosibirsk', label: 'Novosibirsk (UTC+7)' },
+  { value: 'Asia/Krasnoyarsk', label: 'Krasnoyarsk (UTC+7)' },
+  { value: 'Asia/Irkutsk', label: 'Irkutsk (UTC+8)' },
+  { value: 'Asia/Vladivostok', label: 'Vladivostok (UTC+10)' },
+  { value: 'Europe/Madrid', label: 'Madrid / Spain (CET/CEST)' },
+  { value: 'Europe/London', label: 'London (GMT/BST)' },
+  { value: 'Europe/Berlin', label: 'Berlin / Paris (CET/CEST)' },
+  { value: 'America/New_York', label: 'New York (EST/EDT)' },
+  { value: 'America/Los_Angeles', label: 'Los Angeles (PST/PDT)' },
   { value: 'UTC', label: 'UTC' },
 ];
 
@@ -77,7 +77,7 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
       setTimeout(() => setTestSuccessMessage(null), 5000);
     } else {
       triggerHaptic('error');
-      setErrorMsg(res.error?.error || 'Не удалось отправить тестовое напоминание');
+      setErrorMsg(res.error?.error || t(lang, 'error_send_test_reminder'));
     }
   };
 
@@ -147,7 +147,7 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
       }, 700);
     } else {
       triggerHaptic('error');
-      setErrorMsg(res.error?.error || 'Не удалось сохранить настройки');
+      setErrorMsg(res.error?.error || t(lang, 'error_save_settings'));
     }
   };
 
@@ -218,7 +218,7 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
                 <div>
                   <p>{t(lang, 'settings_bot_blocked_warn')}</p>
                   <p className="text-[11px] text-tg-hint font-normal mt-0.5">
-                    Telegram требует подтверждения диалога перед отправкой уведомлений
+                    {t(lang, 'settings_pm_desc')}
                   </p>
                 </div>
               </div>
@@ -331,7 +331,7 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
                 onClick={handleAutoDetectTimezone}
                 className="text-[11px] text-tg-link hover:underline font-medium"
               >
-                Определить
+                {t(lang, 'settings_detect_tz')}
               </button>
             </div>
 
@@ -351,12 +351,12 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
                 </option>
               ))}
               {!COMMON_TIMEZONES.some((tz) => tz.value === timezone) && (
-                <option value="custom">Другой ({timezone})</option>
+                <option value="custom">{t(lang, 'settings_tz_other', { tz: timezone })}</option>
               )}
             </select>
 
             <div className="text-[10px] text-tg-hint font-mono px-1">
-              Текущий часовой пояс: {timezone}
+              {t(lang, 'settings_current_tz', { tz: timezone })}
             </div>
           </div>
 

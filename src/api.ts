@@ -59,13 +59,21 @@ function getInitData(): string {
   return typeof window !== 'undefined' ? window.Telegram?.WebApp?.initData || '' : '';
 }
 
+import { t, detectLanguage } from '../shared/i18n.ts';
+
+function getCurrentLang(): 'ru' | 'es' | 'en' {
+  const telegramLang = window.Telegram?.WebApp?.initDataUnsafe?.user?.language_code;
+  return detectLanguage(telegramLang);
+}
+
 async function requestApi<T>(path: string, options: RequestInit = {}): Promise<{ data?: T; error?: ApiError }> {
   const initData = getInitData();
+  const lang = getCurrentLang();
 
   if (!initData) {
     return {
       error: {
-        error: 'Приложение открыто вне Telegram. Откройте приложение через Telegram-бота для авторизации.',
+        error: t(lang, 'auth_not_in_telegram'),
         code: 'AUTH_FAILED',
       },
     };
@@ -74,7 +82,7 @@ async function requestApi<T>(path: string, options: RequestInit = {}): Promise<{
   if (!SUPABASE_URL) {
     return {
       error: {
-        error: 'Не настроен VITE_SUPABASE_URL в переменных окружения.',
+        error: t(lang, 'auth_no_supabase_url'),
         code: 'AUTH_FAILED',
       },
     };
@@ -97,7 +105,7 @@ async function requestApi<T>(path: string, options: RequestInit = {}): Promise<{
     if (!response.ok) {
       return {
         error: {
-          error: body.error || `Ошибка сервера (${response.status})`,
+          error: body.error || t(lang, 'error_server_code', { status: response.status }),
           code: body.code,
         },
       };
@@ -109,7 +117,7 @@ async function requestApi<T>(path: string, options: RequestInit = {}): Promise<{
     console.error(`API request error [${path}]:`, err);
     return {
       error: {
-        error: `Не удалось подключиться к серверу API (${errMsg}).`,
+        error: t(lang, 'error_network_api', { msg: errMsg }),
         code: 'AUTH_FAILED',
       },
     };

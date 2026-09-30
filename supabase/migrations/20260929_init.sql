@@ -290,3 +290,27 @@ begin
   return jsonb_build_object('pantry', to_jsonb(v_pantry), 'already_member', false);
 end;
 $$;
+
+-- Transactional Pantry Creation with Owner Membership
+create or replace function create_pantry_with_owner(
+  p_name text,
+  p_owner_id bigint
+)
+returns jsonb
+language plpgsql
+security definer
+as $$
+declare
+  v_pantry pantries%rowtype;
+begin
+  insert into pantries (name)
+  values (p_name)
+  returning * into v_pantry;
+
+  insert into pantry_members (pantry_id, user_id, role)
+  values (v_pantry.id, p_owner_id, 'owner');
+
+  return to_jsonb(v_pantry);
+end;
+$$;
+

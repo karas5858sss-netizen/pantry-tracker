@@ -84,7 +84,7 @@ export const PantryModal: React.FC<PantryModalProps> = ({
 
   const handleShareTelegram = () => {
     if (!invite) return;
-    const text = encodeURIComponent('Присоединяйся к моему складу в Pantry Tracker!');
+    const text = encodeURIComponent(t(lang, 'pantry_share_text'));
     const url = encodeURIComponent(invite.inviteUrl);
     const shareUrl = `https://t.me/share/url?url=${url}&text=${text}`;
 
@@ -148,7 +148,7 @@ export const PantryModal: React.FC<PantryModalProps> = ({
   };
 
   const handleRemoveMember = async (userId: number) => {
-    if (!confirm('Исключить этого участника из склада?')) return;
+    if (!confirm(t(lang, 'pantry_remove_confirm'))) return;
     setActionError(null);
     const res = await removePantryMember(currentPantry.id, userId);
     if (res.data) {
@@ -220,7 +220,7 @@ export const PantryModal: React.FC<PantryModalProps> = ({
               activeTab === 'switch' ? 'bg-tg-bg text-tg-text shadow-xs' : 'text-tg-hint'
             }`}
           >
-            Склады ({pantries.length})
+            {t(lang, 'pantry_title_list', { count: pantries.length })}
           </button>
           <button
             type="button"
@@ -238,7 +238,7 @@ export const PantryModal: React.FC<PantryModalProps> = ({
               activeTab === 'members' ? 'bg-tg-bg text-tg-text shadow-xs' : 'text-tg-hint'
             }`}
           >
-            Участники
+            {t(lang, 'pantry_members_tab')}
           </button>
           <button
             type="button"
@@ -247,7 +247,7 @@ export const PantryModal: React.FC<PantryModalProps> = ({
               activeTab === 'create' ? 'bg-tg-bg text-tg-text shadow-xs' : 'text-tg-hint'
             }`}
           >
-            + Создать
+            {t(lang, 'pantry_new_btn')}
           </button>
         </div>
 
@@ -301,7 +301,7 @@ export const PantryModal: React.FC<PantryModalProps> = ({
                     type="text"
                     value={inputInviteCode}
                     onChange={(e) => setInputInviteCode(e.target.value)}
-                    placeholder="Вставьте ссылку или код"
+                    placeholder={t(lang, 'pantry_code_placeholder')}
                     className="flex-1 p-2 rounded-xl bg-tg-secondary border border-tg-hint/20 text-tg-text text-xs focus:outline-none focus:ring-1 focus:ring-tg-button"
                   />
                   <button
@@ -321,7 +321,7 @@ export const PantryModal: React.FC<PantryModalProps> = ({
             <div className="flex flex-col items-center text-center">
               <div className="text-3xl mb-2">🔗</div>
               <h3 className="font-bold text-sm text-tg-text mb-1">
-                Пригласить в склад «{currentPantry.name}»
+                {t(lang, 'pantry_invite_heading', { name: currentPantry.name })}
               </h3>
               <p className="text-tg-hint text-[11px] mb-3 leading-relaxed">
                 {t(lang, 'invite_created')}
@@ -356,7 +356,7 @@ export const PantryModal: React.FC<PantryModalProps> = ({
                   disabled={loadingInvite}
                   className="w-full py-2.5 px-4 bg-tg-button text-tg-button font-medium rounded-xl text-xs transition disabled:opacity-50"
                 >
-                  {loadingInvite ? 'Генерация ссылки...' : 'Сгенерировать ссылку-приглашение'}
+                  {loadingInvite ? t(lang, 'pantry_invite_gen_loading') : t(lang, 'pantry_invite_gen_btn')}
                 </button>
               )}
             </div>
@@ -379,7 +379,7 @@ export const PantryModal: React.FC<PantryModalProps> = ({
                         <span className="text-sm">{m.role === 'owner' ? '👑' : '👤'}</span>
                         <div>
                           <div className="font-medium text-tg-text">
-                            {m.first_name} {m.user_id === currentUserId && '(Вы)'}
+                            {m.first_name} {m.user_id === currentUserId && t(lang, 'pantry_member_you')}
                           </div>
                           {m.username && (
                             <div className="text-[10px] text-tg-hint">@{m.username}</div>
@@ -396,7 +396,7 @@ export const PantryModal: React.FC<PantryModalProps> = ({
                             type="button"
                             onClick={() => handleRemoveMember(m.user_id)}
                             className="text-red-500 hover:text-red-600 font-bold p-1 text-xs"
-                            title="Исключить"
+                            title={t(lang, 'pantry_member_remove_title')}
                           >
                             ✕
                           </button>
@@ -428,7 +428,7 @@ export const PantryModal: React.FC<PantryModalProps> = ({
                 disabled={creatingPantry || !newPantryName.trim()}
                 className="w-full py-2.5 bg-tg-button text-tg-button font-medium rounded-xl text-xs transition disabled:opacity-50"
               >
-                {creatingPantry ? 'Создание...' : t(lang, 'pantry_create_btn')}
+                {creatingPantry ? t(lang, 'pantry_creating') : t(lang, 'pantry_create_btn')}
               </button>
             </form>
           )}

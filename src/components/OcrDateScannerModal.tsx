@@ -381,7 +381,7 @@ export const OcrDateScannerModal: React.FC<OcrDateScannerModalProps> = ({
                       className="absolute w-[80%] h-[35%] rounded-xl border-2 border-emerald-400/90 shadow-[0_0_15px_rgba(52,211,153,0.35)] pointer-events-none flex items-center justify-center"
                     >
                       <div className="absolute top-1 left-2 text-[10px] text-emerald-400 font-mono font-bold bg-black/60 px-1 rounded">
-                        Срок годности
+                        {t(lang, 'ocr_target_label')}
                       </div>
                       <div className="w-full border-t border-dashed border-emerald-400/40" />
                     </div>
@@ -437,7 +437,7 @@ export const OcrDateScannerModal: React.FC<OcrDateScannerModalProps> = ({
                       {t(lang, 'ocr_photo_prompt')}
                     </p>
                     <p className="text-[11px] text-tg-hint">
-                      Чётко сфотографируйте штамп с датой (DD.MM.YYYY или MM.YYYY)
+                      {t(lang, 'ocr_hint_format')}
                     </p>
                   </div>
                 )}
@@ -493,7 +493,7 @@ export const OcrDateScannerModal: React.FC<OcrDateScannerModalProps> = ({
                       {t(lang, 'ocr_candidates_title')}
                     </label>
                     <span className="text-[10px] text-tg-hint font-medium">
-                      Найдено: {candidates.length}
+                      {t(lang, 'ocr_found_count', { count: candidates.length })}
                     </span>
                   </div>
 
@@ -524,7 +524,7 @@ export const OcrDateScannerModal: React.FC<OcrDateScannerModalProps> = ({
                               </span>
                             </div>
                             <p className="text-[11px] text-tg-hint">
-                              Текст на упаковке: <span className="font-mono text-tg-text">«{cand.rawMatch}»</span>
+                              {t(lang, 'ocr_package_text')} <span className="font-mono text-tg-text">«{cand.rawMatch}»</span>
                             </p>
                           </div>
 

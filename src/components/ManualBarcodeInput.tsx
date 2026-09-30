@@ -10,9 +10,9 @@ interface ManualBarcodeInputProps {
 }
 
 const SAMPLE_CODES = [
-  { label: 'EAN-13 (Германия)', code: '4006381333931' },
-  { label: 'EAN-13 (Испания)', code: '8410100000008' },
-  { label: 'EAN-13 (Россия)', code: '4600000000008' },
+  { label: 'EAN-13 (DE)', code: '4006381333931' },
+  { label: 'EAN-13 (ES)', code: '8410100000008' },
+  { label: 'EAN-13 (RU)', code: '4600000000008' },
   { label: 'EAN-8', code: '40123455' },
 ];
 
@@ -60,7 +60,7 @@ export const ManualBarcodeInput: React.FC<ManualBarcodeInputProps> = ({ lang = '
         {/* Input box */}
         <div className="bg-tg-secondary rounded-2xl p-4 border border-tg-hint/20">
           <label className="block text-xs font-semibold text-tg-hint uppercase tracking-wider mb-2">
-            Цифры штрихкода (EAN-13 или EAN-8)
+            {t(lang, 'ean_input_label')}
           </label>
 
           <div className="relative">
@@ -69,7 +69,7 @@ export const ManualBarcodeInput: React.FC<ManualBarcodeInputProps> = ({ lang = '
               inputMode="numeric"
               pattern="[0-9]*"
               autoFocus
-              placeholder="Например, 4006381333931"
+              placeholder={t(lang, 'ean_input_placeholder')}
               value={value}
               onChange={(e) => {
                 setValue(e.target.value);
@@ -102,7 +102,7 @@ export const ManualBarcodeInput: React.FC<ManualBarcodeInputProps> = ({ lang = '
                     onClick={() => setValue(digitsOnly + pendingCheckDigit)}
                     className="text-tg-link font-medium hover:underline"
                   >
-                    + цифра {pendingCheckDigit}
+                    {t(lang, 'barcode_pending_digit', { digit: pendingCheckDigit })}
                   </button>
                 )}
               </div>
@@ -112,7 +112,7 @@ export const ManualBarcodeInput: React.FC<ManualBarcodeInputProps> = ({ lang = '
               <p className="text-emerald-500 font-medium flex items-center gap-1">
                 <span>✅</span>
                 <span>
-                  Корректный {validation.type} (контрольная цифра {validation.actualCheckDigit})
+                  {t(lang, 'barcode_valid_type_checksum', { type: validation.type || 'EAN', digit: validation.actualCheckDigit ?? '' })}
                 </span>
               </p>
             )}
@@ -131,7 +131,7 @@ export const ManualBarcodeInput: React.FC<ManualBarcodeInputProps> = ({ lang = '
             disabled={!validation.isValid}
             className="w-full mt-3 py-3 px-4 bg-tg-button text-tg-button font-medium rounded-xl text-sm shadow-sm active:opacity-85 transition disabled:opacity-40"
           >
-            Применить штрихкод
+            {t(lang, 'ean_apply')}
           </button>
         </div>
       </form>
@@ -139,7 +139,7 @@ export const ManualBarcodeInput: React.FC<ManualBarcodeInputProps> = ({ lang = '
       {/* Quick samples for rapid testing */}
       <div className="w-full mt-4">
         <p className="text-xs text-tg-hint font-medium mb-2 px-1">
-          Быстрые примеры для проверки:
+          {t(lang, 'ean_samples_title')}
         </p>
         <div className="grid grid-cols-2 gap-2">
           {SAMPLE_CODES.map((s) => (

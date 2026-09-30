@@ -5,6 +5,7 @@
 
 import { createWorker } from 'tesseract.js';
 import { parseOcrDateCandidates, preprocessCanvasForOcr, type DateCandidate } from '@shared/ocr.ts';
+import { t } from '@shared/i18n.ts';
 
 export interface OcrScanResult {
   rawText: string;
@@ -23,7 +24,7 @@ export async function recognizeDateFromCanvas(
 ): Promise<OcrScanResult> {
   const preprocessedCanvas = preprocessCanvasForOcr(canvas, cropRect);
 
-  onProgress?.(0.1, 'Инициализация OCR...');
+  onProgress?.(0.1, t(langCode, 'ocr_status_init'));
 
   // Map app language to Tesseract models
   const ocrLang = langCode === 'ru' ? 'rus+eng' : langCode === 'es' ? 'spa+eng' : 'eng';
@@ -34,7 +35,7 @@ export async function recognizeDateFromCanvas(
     langPath: '/tesseract',
     logger: (m) => {
       if (m.status === 'recognizing text' && typeof m.progress === 'number') {
-        onProgress?.(0.2 + m.progress * 0.7, 'Распознавание даты...');
+        onProgress?.(0.2 + m.progress * 0.7, t(langCode, 'ocr_status_recognizing'));
       }
     },
   });
@@ -45,14 +46,14 @@ export async function recognizeDateFromCanvas(
       tessedit_char_whitelist: '0123456789./- :ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzАБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдежзийклмнопрстуфхцчшщъыьэюя',
     });
 
-    onProgress?.(0.4, 'Чтение изображения...');
+    onProgress?.(0.4, t(langCode, 'ocr_status_reading'));
     const result = await worker.recognize(preprocessedCanvas);
 
     const rawText = result.data.text || '';
     const now = new Date();
     const candidates = parseOcrDateCandidates(rawText, now);
 
-    onProgress?.(1.0, 'Готово');
+    onProgress?.(1.0, t(langCode, 'ocr_status_done'));
     return { rawText, candidates };
   } finally {
     await worker.terminate();

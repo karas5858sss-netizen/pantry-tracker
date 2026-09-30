@@ -88,46 +88,21 @@ const db: DatabaseClient = {
       p_timezone: userData.timezone ?? 'Europe/Moscow',
     });
 
-    if (!error && data) {
-      if (data.error === 'USER_LIMIT_REACHED') {
-        const limitErr = new Error('USER_LIMIT_REACHED');
-        (limitErr as any).code = 'USER_LIMIT_REACHED';
-        throw limitErr;
-      }
-      if (data.user) {
-        return data.user as UserRecord;
-      }
+    if (error) {
+      throw new Error(`Failed to upsert user via atomic RPC: ${error.message}`);
     }
 
-    const isNotFound =
-      error?.code === '42883' ||
-      error?.message?.includes('could not find the function') ||
-      error?.message?.includes('does not exist');
-
-    if (error && !isNotFound) {
-      throw new Error(`Failed to upsert user: ${error.message}`);
+    if (data?.error === 'USER_LIMIT_REACHED') {
+      const limitErr = new Error('USER_LIMIT_REACHED');
+      (limitErr as any).code = 'USER_LIMIT_REACHED';
+      throw limitErr;
     }
 
-    // Fallback only if RPC function does not exist (e.g. mock DB in tests)
-    const { data: fallbackData, error: fallbackError } = await supabase
-      .from('users')
-      .upsert(
-        {
-          telegram_id: userData.telegram_id,
-          first_name: userData.first_name,
-          username: userData.username,
-          language_code: userData.language_code,
-          timezone: userData.timezone,
-        },
-        { onConflict: 'telegram_id' }
-      )
-      .select()
-      .single();
-
-    if (fallbackError || !fallbackData) {
-      throw new Error(`Failed to upsert user: ${fallbackError?.message}`);
+    if (!data?.user) {
+      throw new Error('register_user_with_limit returned invalid user payload');
     }
-    return fallbackData as UserRecord;
+
+    return data.user as UserRecord;
   },
 
   async getUserPantries(telegramId: number): Promise<PantryRecord[]> {
@@ -149,31 +124,20 @@ const db: DatabaseClient = {
   },
 
   async createPantry(name: string, ownerTelegramId: number): Promise<PantryRecord> {
-    const { data: pantry, error: pantryErr } = await supabase
-      .from('pantries')
-      .insert({ name })
-      .select()
-      .single();
-
-    if (pantryErr || !pantry) {
-      throw new Error(`Failed to create pantry: ${pantryErr?.message}`);
-    }
-
-    const { error: memberErr } = await supabase.from('pantry_members').insert({
-      pantry_id: pantry.id,
-      user_id: ownerTelegramId,
-      role: 'owner',
+    const { data, error } = await supabase.rpc('create_pantry_with_owner', {
+      p_name: name,
+      p_owner_id: ownerTelegramId,
     });
 
-    if (memberErr) {
-      throw new Error(`Failed to attach owner to pantry: ${memberErr.message}`);
+    if (error || !data) {
+      throw new Error(`Failed to create pantry atomically: ${error?.message || 'Empty response'}`);
     }
 
     return {
-      id: pantry.id,
-      name: pantry.name,
+      id: data.id,
+      name: data.name,
       role: 'owner',
-      created_at: pantry.created_at,
+      created_at: data.created_at,
     };
   },
 
@@ -253,109 +217,38 @@ const db: DatabaseClient = {
       p_user_id: userId,
     });
 
-    if (!error && data) {
-      if (data.error === 'INVITE_NOT_FOUND') {
-        const err = new Error('Invite not found');
-        (err as any).code = 'INVITE_NOT_FOUND';
-        throw err;
-      }
-      if (data.error === 'INVITE_EXPIRED') {
-        const err = new Error('Invite expired');
-        (err as any).code = 'INVITE_EXPIRED';
-        throw err;
-      }
-      if (data.error === 'INVITE_EXHAUSTED') {
-        const err = new Error('Invite already used');
-        (err as any).code = 'INVITE_ALREADY_USED';
-        throw err;
-      }
-      if (data.pantry) {
-        return {
-          pantry: {
-            id: data.pantry.id,
-            name: data.pantry.name,
-            role: data.already_member ? 'owner' : 'member',
-            created_at: data.pantry.created_at,
-          },
-          alreadyMember: Boolean(data.already_member),
-        };
-      }
-    }
-
-    const isNotFound =
-      error?.code === '42883' ||
-      error?.message?.includes('could not find the function') ||
-      error?.message?.includes('does not exist');
-
-    if (error && !isNotFound) {
+    if (error) {
       throw new Error(`RPC join_pantry_via_invite failed: ${error.message}`);
     }
 
-    // Fallback for mockDb / environments without the RPC function
-    const invite = await this.getInvite(code);
-    if (!invite) {
-      throw new Error('Invite not found');
+    if (data?.error === 'INVITE_NOT_FOUND') {
+      const err = new Error('Invite not found');
+      (err as any).code = 'INVITE_NOT_FOUND';
+      throw err;
     }
-
-    const { data: pantry, error: pantryErr } = await supabase
-      .from('pantries')
-      .select('id, name, created_at')
-      .eq('id', invite.pantry_id)
-      .single();
-
-    if (pantryErr || !pantry) {
-      throw new Error('Pantry not found');
+    if (data?.error === 'INVITE_EXPIRED') {
+      const err = new Error('Invite expired');
+      (err as any).code = 'INVITE_EXPIRED';
+      throw err;
     }
-
-    const existingMembership = await this.getUserPantryMembership(invite.pantry_id, userId);
-    if (existingMembership) {
-      return {
-        pantry: {
-          id: pantry.id,
-          name: pantry.name,
-          role: existingMembership,
-          created_at: pantry.created_at,
-        },
-        alreadyMember: true,
-      };
-    }
-
-    if (invite.uses >= invite.max_uses) {
+    if (data?.error === 'INVITE_EXHAUSTED') {
       const err = new Error('Invite already used');
       (err as any).code = 'INVITE_ALREADY_USED';
       throw err;
     }
-
-    // Insert membership
-    const { error: memberErr } = await supabase.from('pantry_members').insert({
-      pantry_id: invite.pantry_id,
-      user_id: userId,
-      role: 'member',
-    });
-
-    if (memberErr) {
-      throw new Error(`Failed to add pantry member: ${memberErr.message}`);
+    if (data?.pantry) {
+      return {
+        pantry: {
+          id: data.pantry.id,
+          name: data.pantry.name,
+          role: data.already_member ? 'owner' : 'member',
+          created_at: data.pantry.created_at,
+        },
+        alreadyMember: Boolean(data.already_member),
+      };
     }
 
-    // Increment uses
-    const { error: updateErr } = await supabase
-      .from('pantry_invites')
-      .update({ uses: invite.uses + 1 })
-      .eq('code', code);
-
-    if (updateErr) {
-      throw new Error(`Failed to update invite uses: ${updateErr.message}`);
-    }
-
-    return {
-      pantry: {
-        id: pantry.id,
-        name: pantry.name,
-        role: 'member',
-        created_at: pantry.created_at,
-      },
-      alreadyMember: false,
-    };
+    throw new Error('RPC join_pantry_via_invite returned unexpected response');
   },
 
   async leavePantry(pantryId: string, userId: number): Promise<void> {
@@ -601,21 +494,6 @@ const db: DatabaseClient = {
     });
 
     if (error) {
-      const isNotFound =
-        error.code === '42883' ||
-        error.message?.includes('could not find the function') ||
-        error.message?.includes('does not exist');
-
-      if (isNotFound) {
-        console.warn('merge_or_create_item RPC not found, falling back to findActiveItem');
-        const existing = await this.findActiveItem(itemData.pantry_id, itemData.expiration_date, itemData.barcode, itemData.name);
-        if (existing) {
-          const updated = await this.updateItem(existing.id, { quantity: existing.quantity + (itemData.quantity ?? 1) });
-          return { item: updated, merged: true };
-        }
-        const created = await this.createItem(itemData);
-        return { item: created, merged: false };
-      }
       throw new Error(`RPC merge_or_create_item failed: ${error.message}`);
     }
 
@@ -637,14 +515,6 @@ const db: DatabaseClient = {
     });
 
     if (error) {
-      const isNotFound =
-        error.code === '42883' ||
-        error.message?.includes('could not find the function') ||
-        error.message?.includes('does not exist');
-
-      if (isNotFound) {
-        return null;
-      }
       throw new Error(`RPC consume_pantry_item failed: ${error.message}`);
     }
 

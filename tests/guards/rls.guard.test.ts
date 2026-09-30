@@ -44,4 +44,12 @@ describe('RLS Guard Tests', () => {
       expect(content).not.toMatch(/create\s+policy/i);
     }
   });
+
+  it('ensures GitHub Actions CI includes a dedicated DB smoke-test job with local Supabase', () => {
+    const ciPath = path.resolve(process.cwd(), '.github/workflows/ci.yml');
+    expect(fs.existsSync(ciPath)).toBe(true);
+    const content = fs.readFileSync(ciPath, 'utf-8');
+    expect(content).toContain('supabase start');
+    expect(content).toContain('test:smoke');
+  });
 });

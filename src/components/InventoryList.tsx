@@ -79,7 +79,7 @@ export const InventoryList: React.FC<InventoryListProps> = ({
 
     if (res.error) {
       triggerHaptic('error');
-      alert(res.error.error || 'Ошибка списания товара');
+      alert(res.error.error || t(lang, 'error_consume_item'));
       return;
     }
 
@@ -116,7 +116,7 @@ export const InventoryList: React.FC<InventoryListProps> = ({
 
     if (res.error) {
       triggerHaptic('error');
-      alert(res.error.error || 'Ошибка очистки склада');
+      alert(res.error.error || t(lang, 'error_clear_pantry'));
       return;
     }
 
@@ -135,7 +135,7 @@ export const InventoryList: React.FC<InventoryListProps> = ({
     const res = await restoreItem(pantryId, item.id, previousState);
     if (res.error) {
       triggerHaptic('error');
-      alert(res.error.error || 'Ошибка отмены списания');
+      alert(res.error.error || t(lang, 'error_undo_item'));
       return;
     }
 
@@ -168,7 +168,7 @@ export const InventoryList: React.FC<InventoryListProps> = ({
 
     if (res.error) {
       triggerHaptic('error');
-      alert(res.error.error || 'Ошибка изменения количества');
+      alert(res.error.error || t(lang, 'error_update_qty'));
       loadItems();
       return;
     }
@@ -181,12 +181,12 @@ export const InventoryList: React.FC<InventoryListProps> = ({
   };
 
   const handlePromptQuantity = async (item: PantryItem) => {
-    const input = prompt(`Изменить количество для «${item.name}» (шт.):`, String(item.quantity));
+    const input = prompt(t(lang, 'prompt_edit_qty', { name: item.name }), String(item.quantity));
     if (input === null) return;
 
     const parsed = parseInt(input.trim(), 10);
     if (isNaN(parsed) || parsed < 0) {
-      alert('Пожалуйста, введите положительное целое число');
+      alert(t(lang, 'alert_positive_integer'));
       return;
     }
 
@@ -210,7 +210,7 @@ export const InventoryList: React.FC<InventoryListProps> = ({
 
     if (res.error) {
       triggerHaptic('error');
-      alert(res.error.error || 'Ошибка изменения количества');
+      alert(res.error.error || t(lang, 'error_update_qty'));
       loadItems();
       return;
     }
@@ -302,21 +302,21 @@ export const InventoryList: React.FC<InventoryListProps> = ({
         <div className="flex items-center justify-between gap-2 overflow-x-auto py-0.5 text-[11px] font-semibold">
           <div className="flex items-center gap-1.5 shrink-0">
             <span className="px-2.5 py-1 rounded-xl bg-tg-secondary border border-tg-hint/15 text-tg-text whitespace-nowrap">
-              📦 {items.length} {t(lang, 'inventory_count_items')} ({stats.totalQty} шт.)
+              📦 {items.length} {t(lang, 'inventory_count_items')} ({stats.totalQty} {t(lang, 'pcs_short')})
             </span>
             {stats.expiredCount > 0 && (
               <span className="px-2.5 py-1 rounded-xl bg-red-500/15 border border-red-500/25 text-red-500 whitespace-nowrap font-bold">
-                🔴 {stats.expiredCount} просрочено
+                🔴 {stats.expiredCount} {t(lang, 'stat_expired')}
               </span>
             )}
             {stats.warningCount > 0 && (
               <span className="px-2.5 py-1 rounded-xl bg-amber-500/15 border border-amber-500/25 text-amber-500 whitespace-nowrap font-bold">
-                🟡 {stats.warningCount} ≤ 3 дн.
+                🟡 {stats.warningCount} {t(lang, 'stat_warning')}
               </span>
             )}
             {stats.freshCount > 0 && (
               <span className="px-2.5 py-1 rounded-xl bg-emerald-500/15 border border-emerald-500/25 text-emerald-500 whitespace-nowrap font-bold">
-                🟢 {stats.freshCount} свежих
+                🟢 {stats.freshCount} {t(lang, 'stat_fresh')}
               </span>
             )}
           </div>
@@ -382,7 +382,7 @@ export const InventoryList: React.FC<InventoryListProps> = ({
 
             if (freshness.status === 'expired') {
               badgeClass = 'bg-red-500/15 text-red-500 border-red-500/25';
-              statusText = `${t(lang, 'freshness_expired')} (${Math.abs(freshness.daysRemaining)} дн.)`;
+              statusText = `${t(lang, 'freshness_expired')} (${Math.abs(freshness.daysRemaining)} ${t(lang, 'days_short')})`;
             } else if (freshness.status === 'warning') {
               badgeClass = 'bg-amber-500/15 text-amber-500 border-amber-500/25';
               statusText =
@@ -422,7 +422,7 @@ export const InventoryList: React.FC<InventoryListProps> = ({
                       disabled={isProcessing}
                       onClick={() => handleStepQuantity(item, -1)}
                       className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-tg-secondary active:scale-90 text-tg-hint hover:text-tg-text font-bold text-base transition disabled:opacity-40"
-                      title="Уменьшить на 1"
+                      title={t(lang, 'btn_decrease_qty')}
                     >
                       −
                     </button>
@@ -431,16 +431,16 @@ export const InventoryList: React.FC<InventoryListProps> = ({
                       disabled={isProcessing}
                       onClick={() => handlePromptQuantity(item)}
                       className="px-1.5 py-0.5 font-bold text-xs text-tg-text hover:text-tg-button active:scale-95 transition min-w-[32px] text-center"
-                      title="Нажмите, чтобы ввести точное число"
+                      title={t(lang, 'btn_exact_qty')}
                     >
-                      {item.quantity} шт.
+                      {item.quantity} {t(lang, 'pcs_short')}
                     </button>
                     <button
                       type="button"
                       disabled={isProcessing}
                       onClick={() => handleStepQuantity(item, 1)}
                       className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-tg-secondary active:scale-90 text-tg-button font-bold text-base transition disabled:opacity-40"
-                      title="Увеличить на 1"
+                      title={t(lang, 'btn_increase_qty')}
                     >
                       +
                     </button>
@@ -499,7 +499,7 @@ export const InventoryList: React.FC<InventoryListProps> = ({
             className="py-1.5 px-3 rounded-xl bg-amber-500 text-black font-bold text-xs shrink-0 active:scale-95 transition shadow-sm flex items-center gap-1"
           >
             <span>↩️</span>
-            <span>{t(lang, 'item_undo')} ({undoSeconds}с)</span>
+            <span>{t(lang, 'item_undo')} ({undoSeconds}{t(lang, 'seconds_short')})</span>
           </button>
         </div>
       )}

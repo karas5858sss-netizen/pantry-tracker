@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "check": "tsc --noEmit",
     "test": "vitest run",
+    "test:smoke": "vitest run tests/guards/db-smoke.guard.test.ts",
     "test:watch": "vitest"
   },
   "dependencies": {

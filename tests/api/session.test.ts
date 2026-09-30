@@ -46,6 +46,11 @@ function createMockDb(): DatabaseClient & {
 
     async upsertUser(userData: UpsertUserData): Promise<UserRecord> {
       const existing = usersMap.get(userData.telegram_id);
+      if (!existing && usersMap.size >= 10) {
+        const limitErr = new Error('USER_LIMIT_REACHED');
+        (limitErr as any).code = 'USER_LIMIT_REACHED';
+        throw limitErr;
+      }
       const updated: UserRecord = {
         telegram_id: userData.telegram_id,
         first_name: userData.first_name,
