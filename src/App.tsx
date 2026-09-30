@@ -181,6 +181,13 @@ export const App: React.FC = () => {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleOpenManualAdd = () => {
+    setSelectedProductBarcode(null);
+    setCurrentResult(null);
+    setIsProductModalOpen(true);
+    triggerHaptic('light');
+  };
+
   return (
     <div className="min-h-screen bg-tg-bg text-tg-text flex flex-col items-center px-4 safe-area-top-padding safe-area-bottom-padding max-w-md mx-auto">
       {/* Toast Notification */}
@@ -328,6 +335,7 @@ export const App: React.FC = () => {
           pantryName={currentPantry.name}
           lang={lang}
           onOpenScanner={() => setActiveSection('scanner')}
+          onAddManual={handleOpenManualAdd}
         />
       )}
 
@@ -471,7 +479,11 @@ export const App: React.FC = () => {
               />
             )}
             {scanType === 'manual' && (
-              <ManualBarcodeInput lang={lang} onDetected={handleDetected} />
+              <ManualBarcodeInput
+                lang={lang}
+                onDetected={handleDetected}
+                onAddWithoutBarcode={handleOpenManualAdd}
+              />
             )}
           </main>
 
@@ -559,7 +571,7 @@ export const App: React.FC = () => {
       )}
 
       {/* Stage 4 Product Card / Add Modal */}
-      {selectedProductBarcode && (
+      {isProductModalOpen && (
         <ProductCardModal
           isOpen={isProductModalOpen}
           barcode={selectedProductBarcode}
@@ -569,18 +581,21 @@ export const App: React.FC = () => {
           initialExpirationDate={prefilledOcrDate || undefined}
           onClose={() => {
             setIsProductModalOpen(false);
+            setSelectedProductBarcode(null);
             setPrefilledOcrDate(null);
           }}
           onItemAdded={(item) => {
             setToastMessage(t(lang, 'toast_item_added', { name: item.name, qty: item.quantity, exp: item.expiration_date }));
             triggerHaptic('success');
             setPrefilledOcrDate(null);
+            setSelectedProductBarcode(null);
             setTimeout(() => setToastMessage(null), 3500);
             setInventoryRefreshKey((k) => k + 1);
           }}
           onProductConfirmed={(p) => {
             setToastMessage(t(lang, 'toast_product_confirmed', { name: p.name, qty: p.quantity }));
             setPrefilledOcrDate(null);
+            setSelectedProductBarcode(null);
             setTimeout(() => setToastMessage(null), 3500);
           }}
         />

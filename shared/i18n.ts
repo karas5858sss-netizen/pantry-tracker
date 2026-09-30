@@ -261,6 +261,12 @@ export const translations = {
     copied: 'Скопировано!',
     history_title: 'История сканирований',
     history_clear: 'Очистить',
+    btn_add_market_item: '➕ Без штрихкода',
+    btn_market_item_long: '🍎 Добавить товар с рынка / без штрихкода',
+    product_no_barcode_title: 'Товар без штрихкода',
+    product_no_barcode_subtitle: 'Овощи, фрукты, весовые товары или фермерские продукты',
+    badge_no_barcode: 'Развес / рынок',
+    product_market_placeholder: 'Например: Помидоры (1.5 кг) или Черешня',
   },
   es: {
     app_title: 'Pantry Tracker',
@@ -516,6 +522,12 @@ export const translations = {
     copied: '¡Copiado!',
     history_title: 'Historial de escaneos',
     history_clear: 'Limpiar',
+    btn_add_market_item: '➕ Sin código',
+    btn_market_item_long: '🍎 Añadir producto a granel / sin código',
+    product_no_barcode_title: 'Producto sin código',
+    product_no_barcode_subtitle: 'Verduras, frutas, productos a granel o de mercado',
+    badge_no_barcode: 'A granel / mercado',
+    product_market_placeholder: 'Ej: Tomates (1.5 kg) o Cerezas',
   },
   en: {
     app_title: 'Pantry Tracker',
@@ -771,6 +783,12 @@ export const translations = {
     copied: 'Copied!',
     history_title: 'Scan history',
     history_clear: 'Clear',
+    btn_add_market_item: '➕ No barcode',
+    btn_market_item_long: '🍎 Add market / bulk item without barcode',
+    product_no_barcode_title: 'Item without barcode',
+    product_no_barcode_subtitle: 'Vegetables, fruits, bulk or market produce',
+    badge_no_barcode: 'Bulk / market',
+    product_market_placeholder: 'e.g. Tomatoes (1.5 kg) or Cherries',
   },
 } as const;
 

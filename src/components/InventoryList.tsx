@@ -17,6 +17,7 @@ interface InventoryListProps {
   pantryName: string;
   lang: SupportedLanguage;
   onOpenScanner: () => void;
+  onAddManual?: () => void;
 }
 
 interface UndoState {
@@ -30,6 +31,7 @@ export const InventoryList: React.FC<InventoryListProps> = ({
   pantryName,
   lang,
   onOpenScanner,
+  onAddManual,
 }) => {
   const [items, setItems] = useState<PantryItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -268,12 +270,26 @@ export const InventoryList: React.FC<InventoryListProps> = ({
 
   return (
     <div className="w-full space-y-3 pb-24">
-      {/* Title */}
+      {/* Title & Quick Add */}
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-bold text-tg-text flex items-center gap-1.5">
           <span>📦</span>
           <span>{pantryName}: {t(lang, 'inventory_title')}</span>
         </h2>
+        {onAddManual && (
+          <button
+            type="button"
+            onClick={() => {
+              triggerHaptic('light');
+              onAddManual();
+            }}
+            className="px-2.5 py-1 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-500 border border-emerald-500/25 text-xs font-bold transition active:scale-95 flex items-center gap-1.5 shadow-xs"
+            title={t(lang, 'btn_add_market_item')}
+          >
+            <span>➕</span>
+            <span>{t(lang, 'btn_add_market_item')}</span>
+          </button>
+        )}
       </div>
 
       {/* Search Bar & Stats */}
@@ -351,14 +367,29 @@ export const InventoryList: React.FC<InventoryListProps> = ({
             <h3 className="font-bold text-sm text-tg-text">{t(lang, 'inventory_empty')}</h3>
             <p className="text-xs text-tg-hint max-w-xs">{t(lang, 'inventory_scan_first')}</p>
           </div>
-          <button
-            type="button"
-            onClick={onOpenScanner}
-            className="mt-2 py-2.5 px-5 rounded-xl bg-tg-button text-tg-button text-xs font-bold shadow-md active:scale-95 transition flex items-center gap-2"
-          >
-            <span>📷</span>
-            <span>{t(lang, 'tab_scan')}</span>
-          </button>
+          <div className="flex items-center gap-2 mt-2">
+            <button
+              type="button"
+              onClick={onOpenScanner}
+              className="py-2.5 px-4 rounded-xl bg-tg-button text-tg-button text-xs font-bold shadow-md active:scale-95 transition flex items-center gap-2"
+            >
+              <span>📷</span>
+              <span>{t(lang, 'tab_scan')}</span>
+            </button>
+            {onAddManual && (
+              <button
+                type="button"
+                onClick={() => {
+                  triggerHaptic('light');
+                  onAddManual();
+                }}
+                className="py-2.5 px-4 rounded-xl bg-emerald-500/15 text-emerald-500 border border-emerald-500/25 text-xs font-bold active:scale-95 transition flex items-center gap-2 shadow-xs"
+              >
+                <span>➕</span>
+                <span>{t(lang, 'btn_add_market_item')}</span>
+              </button>
+            )}
+          </div>
         </div>
       )}
 

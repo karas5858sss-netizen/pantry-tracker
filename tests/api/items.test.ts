@@ -450,6 +450,31 @@ describe('Stage 4: Items & Expiration Dates API', () => {
       expect(kefirItems[0].quantity).toBe(3);
     });
 
+    it('successfully creates and merges market/bulk item without barcode (by name)', async () => {
+      // 1. Add market tomatoes first time
+      const res1 = await makeAuthRequest(ownerUser, 'POST', '/pantries/pantry-1/items', {
+        name: 'Помидоры (1.5 кг)',
+        expiration_date: '2026-10-05',
+        quantity: 1,
+      });
+      expect(res1.status).toBe(201);
+      const data1 = await res1.json();
+      expect(data1.item.barcode).toBeNull();
+      expect(data1.item.name).toBe('Помидоры (1.5 кг)');
+      expect(data1.item.quantity).toBe(1);
+
+      // 2. Add same market tomatoes again with matching expiration date
+      const res2 = await makeAuthRequest(ownerUser, 'POST', '/pantries/pantry-1/items', {
+        name: 'Помидоры (1.5 кг)',
+        expiration_date: '2026-10-05',
+        quantity: 2,
+      });
+      expect(res2.status).toBe(200);
+      const data2 = await res2.json();
+      expect(data2.item.id).toBe(data1.item.id);
+      expect(data2.item.quantity).toBe(3);
+    });
+
     it('creates separate batch when adding same barcode but with different expiration date', async () => {
       // Batch A: 2026-10-10
       await makeAuthRequest(ownerUser, 'POST', '/pantries/pantry-1/items', {

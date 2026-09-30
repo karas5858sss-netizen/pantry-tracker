@@ -7,6 +7,7 @@ import { t, type SupportedLanguage } from '@shared/i18n.ts';
 interface ManualBarcodeInputProps {
   lang?: SupportedLanguage;
   onDetected: (detection: BarcodeDetection) => void;
+  onAddWithoutBarcode?: () => void;
 }
 
 const SAMPLE_CODES = [
@@ -16,7 +17,11 @@ const SAMPLE_CODES = [
   { label: 'EAN-8', code: '40123455' },
 ];
 
-export const ManualBarcodeInput: React.FC<ManualBarcodeInputProps> = ({ lang = 'ru', onDetected }) => {
+export const ManualBarcodeInput: React.FC<ManualBarcodeInputProps> = ({
+  lang = 'ru',
+  onDetected,
+  onAddWithoutBarcode,
+}) => {
   const [value, setValue] = useState('');
   const [submittedAttempt, setSubmittedAttempt] = useState(false);
 
@@ -155,6 +160,22 @@ export const ManualBarcodeInput: React.FC<ManualBarcodeInputProps> = ({ lang = '
           ))}
         </div>
       </div>
+
+      {onAddWithoutBarcode && (
+        <div className="w-full mt-4 pt-3 border-t border-tg-hint/15">
+          <button
+            type="button"
+            onClick={() => {
+              triggerHaptic('light');
+              onAddWithoutBarcode();
+            }}
+            className="w-full py-2.5 px-3 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 border border-emerald-500/25 rounded-xl text-xs font-semibold transition active:scale-98 flex items-center justify-center gap-2"
+          >
+            <span>🍎</span>
+            <span>{t(lang, 'btn_market_item_long')}</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 };

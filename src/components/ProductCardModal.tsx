@@ -12,13 +12,13 @@ import { OcrDateScannerModal } from './OcrDateScannerModal.tsx';
 
 interface ProductCardModalProps {
   isOpen: boolean;
-  barcode: string;
+  barcode?: string | null;
   format?: string;
   lang: SupportedLanguage;
   currentPantryId?: string;
   initialExpirationDate?: string;
   onClose: () => void;
-  onProductConfirmed?: (product: { barcode: string; name: string; quantity: number; expirationDate: string }) => void;
+  onProductConfirmed?: (product: { barcode?: string | null; name: string; quantity: number; expirationDate: string }) => void;
   onItemAdded?: (item: PantryItem) => void;
 }
 
@@ -56,12 +56,11 @@ export const ProductCardModal: React.FC<ProductCardModalProps> = ({
   }, [isOpen]);
 
   useEffect(() => {
-    if (!isOpen || !barcode) return;
+    if (!isOpen) return;
 
-    setLoading(true);
     setProduct(null);
     setProductName('');
-    setIsEditingName(false);
+    setIsEditingName(!barcode);
     setQuantity(1);
     setErrorMsg(null);
     setDateMode('exact');
@@ -77,6 +76,16 @@ export const ProductCardModal: React.FC<ProductCardModalProps> = ({
       setSelectedPreset('7d');
     }
 
+    if (!barcode) {
+      setLoading(false);
+      setIsEditingName(true);
+      setTimeout(() => {
+        nameInputRef.current?.focus();
+      }, 150);
+      return;
+    }
+
+    setLoading(true);
     lookupProduct(barcode, lang).then((res) => {
       setLoading(false);
       if (res.found && res.product) {
@@ -91,9 +100,9 @@ export const ProductCardModal: React.FC<ProductCardModalProps> = ({
         }, 150);
       }
     });
-  }, [isOpen, barcode, lang]);
+  }, [isOpen, barcode, lang, initialExpirationDate]);
 
-  if (!isOpen || !barcode) return null;
+  if (!isOpen) return null;
 
   const handleApplyPreset = (key: string, dateIso: string) => {
     setSelectedPreset(key);
@@ -149,7 +158,7 @@ export const ProductCardModal: React.FC<ProductCardModalProps> = ({
     // If pantry is active, add directly to pantry
     if (currentPantryId) {
       const addRes = await createItem(currentPantryId, {
-        barcode,
+        barcode: barcode || null,
         name: cleanName,
         quantity,
         expiration_date: finalDate,
@@ -164,7 +173,7 @@ export const ProductCardModal: React.FC<ProductCardModalProps> = ({
         }
         if (onProductConfirmed) {
           onProductConfirmed({
-            barcode,
+            barcode: barcode || null,
             name: cleanName,
             quantity,
             expirationDate: finalDate,
@@ -179,24 +188,37 @@ export const ProductCardModal: React.FC<ProductCardModalProps> = ({
       }
     }
 
-    // Fallback: save to catalog only if no pantry
-    const saveRes = await saveProduct(barcode, cleanName, 'manual');
-    setSaving(false);
+    // Fallback: save to catalog only if barcode is present and no pantry
+    if (barcode) {
+      const saveRes = await saveProduct(barcode, cleanName, 'manual');
+      setSaving(false);
 
-    if (saveRes.data) {
-      triggerHaptic('success');
+      if (saveRes.data) {
+        triggerHaptic('success');
+        if (onProductConfirmed) {
+          onProductConfirmed({
+            barcode,
+            name: cleanName,
+            quantity,
+            expirationDate: finalDate,
+          });
+        }
+        onClose();
+      } else {
+        setErrorMsg(saveRes.error?.error || t(lang, 'error_save_product'));
+        triggerHaptic('error');
+      }
+    } else {
+      setSaving(false);
       if (onProductConfirmed) {
         onProductConfirmed({
-          barcode,
+          barcode: null,
           name: cleanName,
           quantity,
           expirationDate: finalDate,
         });
       }
       onClose();
-    } else {
-      setErrorMsg(saveRes.error?.error || t(lang, 'error_save_product'));
-      triggerHaptic('error');
     }
   };
 
@@ -238,18 +260,26 @@ export const ProductCardModal: React.FC<ProductCardModalProps> = ({
         {/* Modal Header */}
         <div className="p-4 border-b border-tg-hint/15 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="text-xl">🏷️</span>
+            <span className="text-xl">{barcode ? '🏷️' : '🍎'}</span>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-mono font-bold text-sm text-tg-text tracking-wide">{barcode}</span>
-                {format && (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-tg-secondary text-tg-hint font-semibold">
-                    {format}
-                  </span>
+                {barcode ? (
+                  <>
+                    <span className="font-mono font-bold text-sm text-tg-text tracking-wide">{barcode}</span>
+                    {format && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-tg-secondary text-tg-hint font-semibold">
+                        {format}
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  <span className="font-bold text-sm text-tg-text">{t(lang, 'product_no_barcode_title')}</span>
                 )}
               </div>
               <p className="text-[11px] text-tg-hint">
-                {loading ? t(lang, 'product_searching') : product ? t(lang, 'product_found') : t(lang, 'product_not_found')}
+                {barcode
+                  ? (loading ? t(lang, 'product_searching') : product ? t(lang, 'product_found') : t(lang, 'product_not_found'))
+                  : t(lang, 'product_no_barcode_subtitle')}
               </p>
             </div>
           </div>
@@ -285,19 +315,25 @@ export const ProductCardModal: React.FC<ProductCardModalProps> = ({
                 <label className="block text-xs font-medium text-tg-hint">
                   {t(lang, 'product_name_label')}:
                 </label>
-                {product?.source === 'off' && (
+                {!barcode && (
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-500 border border-amber-500/20 flex items-center gap-1">
+                    <span>⚖️</span>
+                    <span>{t(lang, 'badge_no_barcode')}</span>
+                  </span>
+                )}
+                {barcode && product?.source === 'off' && (
                   <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-500 border border-emerald-500/20 flex items-center gap-1">
                     <span>🌿</span>
                     <span>{t(lang, 'product_source_off')}</span>
                   </span>
                 )}
-                {product?.source === 'manual' && (
+                {barcode && product?.source === 'manual' && (
                   <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-500 border border-blue-500/20 flex items-center gap-1">
                     <span>📦</span>
                     <span>{t(lang, 'product_source_manual')}</span>
                   </span>
                 )}
-                {!product && (
+                {barcode && !product && (
                   <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-500 border border-amber-500/20 flex items-center gap-1">
                     <span>✏️</span>
                     <span>{t(lang, 'product_source_custom')}</span>
@@ -313,11 +349,11 @@ export const ProductCardModal: React.FC<ProductCardModalProps> = ({
                     type="text"
                     value={productName}
                     onChange={(e) => setProductName(e.target.value)}
-                    placeholder={t(lang, 'product_name_placeholder')}
+                    placeholder={barcode ? t(lang, 'product_name_placeholder') : t(lang, 'product_market_placeholder')}
                     className="w-full p-3 rounded-xl bg-tg-secondary border border-tg-hint/25 text-tg-text text-sm focus:outline-none focus:ring-2 focus:ring-tg-button"
                     autoFocus
                   />
-                  {!product && (
+                  {!product && barcode && (
                     <p className="text-[11px] text-amber-500 font-medium">
                       {t(lang, 'product_not_in_db_hint')}
                     </p>
