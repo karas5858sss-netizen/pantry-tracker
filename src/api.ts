@@ -466,7 +466,7 @@ export async function updateUserSettings(
   payload: UpdateUserSettingsPayload
 ): Promise<{ data?: { user: SessionUser }; error?: ApiError }> {
   return requestApi<{ user: SessionUser }>('/user/settings', {
-    method: 'PATCH',
+    method: 'POST',
     body: JSON.stringify(payload),
   });
 }
