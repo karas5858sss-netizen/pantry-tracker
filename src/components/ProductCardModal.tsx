@@ -8,6 +8,7 @@ import {
   validateExpirationDate,
   addDays,
 } from '@shared/expiration.ts';
+import { OcrDateScannerModal } from './OcrDateScannerModal.tsx';
 
 interface ProductCardModalProps {
   isOpen: boolean;
@@ -43,6 +44,7 @@ export const ProductCardModal: React.FC<ProductCardModalProps> = ({
   const [expirationDate, setExpirationDate] = useState<string>('');
   const [monthYearInput, setMonthYearInput] = useState<string>('');
   const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
+  const [isOcrOpen, setIsOcrOpen] = useState(false);
 
   const nameInputRef = useRef<HTMLInputElement>(null);
 
@@ -369,36 +371,53 @@ export const ProductCardModal: React.FC<ProductCardModalProps> = ({
                       {t(lang, 'exp_date_label')}
                     </label>
                   </div>
-                  {/* Mode switcher tabs */}
-                  <div className="flex bg-tg-secondary p-0.5 rounded-lg border border-tg-hint/15 text-[10px] font-semibold">
+
+                  <div className="flex items-center gap-1.5">
+                    {/* Stage 8: OCR Date Recognition Button */}
                     <button
                       type="button"
                       onClick={() => {
-                        setDateMode('exact');
+                        setIsOcrOpen(true);
                         triggerHaptic('light');
                       }}
-                      className={`px-2 py-1 rounded-md transition ${
-                        dateMode === 'exact'
-                          ? 'bg-tg-button text-tg-button shadow-xs'
-                          : 'text-tg-hint hover:text-tg-text'
-                      }`}
+                      className="px-2 py-1 rounded-lg bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold hover:bg-emerald-500/25 active:scale-95 transition flex items-center gap-1"
+                      title={t(lang, 'ocr_scan_btn')}
                     >
-                      {t(lang, 'exp_exact_date_mode')}
+                      <span>📷</span>
+                      <span>{t(lang, 'ocr_scan_btn')}</span>
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setDateMode('monthYear');
-                        triggerHaptic('light');
-                      }}
-                      className={`px-2 py-1 rounded-md transition ${
-                        dateMode === 'monthYear'
-                          ? 'bg-tg-button text-tg-button shadow-xs'
-                          : 'text-tg-hint hover:text-tg-text'
-                      }`}
-                    >
-                      {t(lang, 'exp_month_year_mode')}
-                    </button>
+
+                    {/* Mode switcher tabs */}
+                    <div className="flex bg-tg-secondary p-0.5 rounded-lg border border-tg-hint/15 text-[10px] font-semibold">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDateMode('exact');
+                          triggerHaptic('light');
+                        }}
+                        className={`px-2 py-1 rounded-md transition ${
+                          dateMode === 'exact'
+                            ? 'bg-tg-button text-tg-button shadow-xs'
+                            : 'text-tg-hint hover:text-tg-text'
+                        }`}
+                      >
+                        {t(lang, 'exp_exact_date_mode')}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDateMode('monthYear');
+                          triggerHaptic('light');
+                        }}
+                        className={`px-2 py-1 rounded-md transition ${
+                          dateMode === 'monthYear'
+                            ? 'bg-tg-button text-tg-button shadow-xs'
+                            : 'text-tg-hint hover:text-tg-text'
+                        }`}
+                      >
+                        {t(lang, 'exp_month_year_mode')}
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -482,6 +501,20 @@ export const ProductCardModal: React.FC<ProductCardModalProps> = ({
           )}
         </form>
       </div>
+
+      {/* Stage 8: OCR Date Recognition Modal */}
+      <OcrDateScannerModal
+        isOpen={isOcrOpen}
+        lang={lang}
+        onClose={() => setIsOcrOpen(false)}
+        onDateSelected={(dateIso) => {
+          setExpirationDate(dateIso);
+          setDateMode('exact');
+          setSelectedPreset(null);
+          setErrorMsg(null);
+          triggerHaptic('success');
+        }}
+      />
     </div>
   );
 };

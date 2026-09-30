@@ -147,6 +147,18 @@ export const translations = {
     settings_bot_blocked_warn: 'Для получения напоминаний напишите боту в личные сообщения /start',
     settings_open_bot: 'Открыть диалог с ботом',
 
+    // Stage 8: OCR Date Recognition
+    ocr_scan_btn: 'Скан даты',
+    ocr_modal_title: 'Распознавание даты (OCR)',
+    ocr_photo_prompt: 'Сфотографируйте дату срока годности на упаковке',
+    ocr_candidates_title: 'Распознанные даты (выберите нужную):',
+    ocr_no_candidates: 'Дата не распознана. Попробуйте сфотографировать чётче или введите вручную.',
+    ocr_confirm_btn: 'Применить дату',
+    ocr_processing: 'Идёт распознавание...',
+    ocr_select_hint: 'Нажмите на подходящую дату для подтверждения',
+    ocr_camera_btn: 'Снимок камеры',
+    ocr_gallery_btn: 'Из галереи',
+
     // Common
     btn_retry: 'Повторить',
     btn_copy: 'Копировать',
@@ -295,6 +307,18 @@ export const translations = {
     settings_bot_blocked_warn: 'Para recibir avisos, envía /start al bot por mensaje privado',
     settings_open_bot: 'Abrir chat con el bot',
 
+    // Stage 8: OCR Date Recognition
+    ocr_scan_btn: 'Escanear fecha',
+    ocr_modal_title: 'Reconocimiento de fecha (OCR)',
+    ocr_photo_prompt: 'Fotografía la fecha de caducidad en el envase',
+    ocr_candidates_title: 'Fechas detectadas (selecciona una):',
+    ocr_no_candidates: 'No se detectó ninguna fecha. Intenta tomar una foto más clara o ingrésala manualmente.',
+    ocr_confirm_btn: 'Aplicar fecha',
+    ocr_processing: 'Reconociendo texto...',
+    ocr_select_hint: 'Pulsa en la fecha correspondiente para confirmar',
+    ocr_camera_btn: 'Hacer foto',
+    ocr_gallery_btn: 'De la galería',
+
     // Common
     btn_retry: 'Reintentar',
     btn_copy: 'Copiar',
@@ -442,6 +466,18 @@ export const translations = {
     settings_saved: 'Settings saved!',
     settings_bot_blocked_warn: 'To receive notifications, message /start to the bot in direct chat',
     settings_open_bot: 'Open chat with bot',
+
+    // Stage 8: OCR Date Recognition
+    ocr_scan_btn: 'Scan date',
+    ocr_modal_title: 'Date Recognition (OCR)',
+    ocr_photo_prompt: 'Take a clear photo of the expiration date on the package',
+    ocr_candidates_title: 'Detected dates (choose one):',
+    ocr_no_candidates: 'No valid dates detected. Try taking a clearer photo or enter manually.',
+    ocr_confirm_btn: 'Apply date',
+    ocr_processing: 'Recognizing text...',
+    ocr_select_hint: 'Tap a matching date to confirm',
+    ocr_camera_btn: 'Take photo',
+    ocr_gallery_btn: 'From gallery',
 
     // Common
     btn_retry: 'Retry',
