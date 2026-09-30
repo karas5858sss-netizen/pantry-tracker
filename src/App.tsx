@@ -7,6 +7,7 @@ import { ProductCardModal } from './components/ProductCardModal.tsx';
 import { InventoryList } from './components/InventoryList.tsx';
 import { FifoBatchPickerModal } from './components/FifoBatchPickerModal.tsx';
 import { UserSettingsModal } from './components/UserSettingsModal.tsx';
+import { OcrDateScannerModal } from './components/OcrDateScannerModal.tsx';
 import { initTelegramApp, triggerHaptic } from './telegram.ts';
 import {
   fetchSession,
@@ -56,6 +57,7 @@ export const App: React.FC = () => {
   // Modal state
   const [isPantryModalOpen, setIsPantryModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [isMainOcrOpen, setIsMainOcrOpen] = useState(false);
 
   // Language state
   const tgUser = typeof window !== 'undefined' ? window.Telegram?.WebApp?.initDataUnsafe?.user : undefined;
@@ -208,7 +210,7 @@ export const App: React.FC = () => {
             ⚙️
           </button>
           <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 font-semibold">
-            Stage 7
+            v1.0 • Ready
           </span>
         </div>
       </header>
@@ -369,15 +371,15 @@ export const App: React.FC = () => {
             </div>
           </div>
 
-          {/* Scanner Input Sub-mode: Live / Photo / Manual */}
-          <nav className="w-full grid grid-cols-3 gap-1 bg-tg-secondary p-1 rounded-xl border border-tg-hint/15">
+          {/* Scanner Input Sub-mode: Live / Photo / Manual / OCR */}
+          <nav className="w-full grid grid-cols-4 gap-1 bg-tg-secondary p-1 rounded-xl border border-tg-hint/15">
             <button
               type="button"
               onClick={() => {
                 setScanType('live');
                 triggerHaptic('light');
               }}
-              className={`py-1.5 text-xs font-semibold rounded-lg transition flex items-center justify-center gap-1.5 ${
+              className={`py-1.5 text-xs font-semibold rounded-lg transition flex items-center justify-center gap-1 ${
                 scanType === 'live'
                   ? 'bg-tg-bg text-tg-text shadow-xs'
                   : 'text-tg-hint hover:text-tg-text'
@@ -393,7 +395,7 @@ export const App: React.FC = () => {
                 setScanType('photo');
                 triggerHaptic('light');
               }}
-              className={`py-1.5 text-xs font-semibold rounded-lg transition flex items-center justify-center gap-1.5 ${
+              className={`py-1.5 text-xs font-semibold rounded-lg transition flex items-center justify-center gap-1 ${
                 scanType === 'photo'
                   ? 'bg-tg-bg text-tg-text shadow-xs'
                   : 'text-tg-hint hover:text-tg-text'
@@ -409,7 +411,7 @@ export const App: React.FC = () => {
                 setScanType('manual');
                 triggerHaptic('light');
               }}
-              className={`py-1.5 text-xs font-semibold rounded-lg transition flex items-center justify-center gap-1.5 ${
+              className={`py-1.5 text-xs font-semibold rounded-lg transition flex items-center justify-center gap-1 ${
                 scanType === 'manual'
                   ? 'bg-tg-bg text-tg-text shadow-xs'
                   : 'text-tg-hint hover:text-tg-text'
@@ -417,6 +419,19 @@ export const App: React.FC = () => {
             >
               <span>⌨️</span>
               <span>{t(lang, 'mode_manual')}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setIsMainOcrOpen(true);
+                triggerHaptic('light');
+              }}
+              className="py-1.5 text-xs font-semibold rounded-lg transition flex items-center justify-center gap-1 text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 active:scale-95 border border-emerald-500/25"
+              title={t(lang, 'ocr_scan_btn')}
+            >
+              <span>🔍</span>
+              <span>OCR</span>
             </button>
           </nav>
 
@@ -568,6 +583,18 @@ export const App: React.FC = () => {
           }}
         />
       )}
+
+      {/* Stage 8 Standalone OCR Scanner Modal */}
+      <OcrDateScannerModal
+        isOpen={isMainOcrOpen}
+        lang={lang}
+        onClose={() => setIsMainOcrOpen(false)}
+        onDateSelected={(dateIso) => {
+          setToastMessage(`✓ Дата распознана: ${dateIso}`);
+          triggerHaptic('success');
+          setTimeout(() => setToastMessage(null), 3500);
+        }}
+      />
     </div>
   );
 };

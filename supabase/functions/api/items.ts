@@ -246,15 +246,32 @@ export async function handleRestoreItem(
     );
   }
 
+  const now = deps.now ? deps.now() : new Date();
+
+  // Enforce Undo window protection (5s UI banner + grace period for network latency)
+  if (item.closed_at) {
+    const elapsedMs = now.getTime() - new Date(item.closed_at).getTime();
+    if (elapsedMs > 15000) {
+      return new Response(
+        JSON.stringify({
+          error: 'Время отмены действия (Undo) истекло (доступно только сразу после списания).',
+          code: 'UNDO_EXPIRED',
+        }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+  }
+
   const body = await req.json().catch(() => null);
-  const previousQuantity = typeof body?.quantity === 'number' && body.quantity > 0 ? body.quantity : item.quantity + 1;
-  const previousStatus = body?.status === 'consumed' || body?.status === 'discarded' ? body.status : 'active';
-  const previousClosedAt = body?.closed_at !== undefined ? body.closed_at : null;
+  // Restore safely: either re-open closed item with its original quantity, or increment decremented quantity by 1
+  const restoredQuantity = typeof body?.quantity === 'number' && body.quantity > 0 
+    ? Math.min(body.quantity, item.quantity + 1)
+    : item.quantity + 1;
 
   const restored = await deps.db.updateItem(item.id, {
-    quantity: previousQuantity,
-    status: previousStatus,
-    closed_at: previousClosedAt,
+    quantity: restoredQuantity,
+    status: 'active',
+    closed_at: null,
   });
 
   return new Response(

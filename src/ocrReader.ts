@@ -13,17 +13,22 @@ export interface OcrScanResult {
 
 /**
  * Recognizes date from an HTMLCanvasElement (cropped and preprocessed for contrast).
+ * Supports localized OCR models: 'rus+eng' for Russian, 'spa+eng' for Spanish, 'eng' for English.
  */
 export async function recognizeDateFromCanvas(
   canvas: HTMLCanvasElement,
   cropRect?: { x: number; y: number; width: number; height: number },
-  onProgress?: (progress: number, status: string) => void
+  onProgress?: (progress: number, status: string) => void,
+  langCode: 'ru' | 'es' | 'en' = 'ru'
 ): Promise<OcrScanResult> {
   const preprocessedCanvas = preprocessCanvasForOcr(canvas, cropRect);
 
   onProgress?.(0.1, 'Инициализация OCR...');
 
-  const worker = await createWorker('eng', 1, {
+  // Map app language to Tesseract models
+  const ocrLang = langCode === 'ru' ? 'rus+eng' : langCode === 'es' ? 'spa+eng' : 'eng';
+
+  const worker = await createWorker(ocrLang, 1, {
     workerPath: '/tesseract/worker.min.js',
     corePath: '/tesseract/tesseract-core-lstm.wasm.js',
     langPath: '/tesseract',
@@ -60,7 +65,8 @@ export async function recognizeDateFromCanvas(
 export async function recognizeDateFromFile(
   file: File | Blob,
   cropRect?: { x: number; y: number; width: number; height: number },
-  onProgress?: (progress: number, status: string) => void
+  onProgress?: (progress: number, status: string) => void,
+  langCode: 'ru' | 'es' | 'en' = 'ru'
 ): Promise<OcrScanResult> {
   const url = URL.createObjectURL(file);
   try {
@@ -80,7 +86,7 @@ export async function recognizeDateFromFile(
     }
     ctx.drawImage(img, 0, 0);
 
-    return await recognizeDateFromCanvas(canvas, cropRect, onProgress);
+    return await recognizeDateFromCanvas(canvas, cropRect, onProgress, langCode);
   } finally {
     URL.revokeObjectURL(url);
   }

@@ -15,25 +15,17 @@ export async function handleSendReminders(
   req: Request,
   deps: SendRemindersDependencies
 ): Promise<Response> {
-  // 1. Authenticate cron trigger
+  // 1. Authenticate cron trigger (STRICTLY require Authorization: Bearer <CRON_SECRET>)
   const authHeader = req.headers.get('authorization') || req.headers.get('Authorization');
-  const cronSecretHeader = req.headers.get('x-cron-secret');
-  const url = new URL(req.url);
-  const secretQuery = url.searchParams.get('secret') || url.searchParams.get('cron_secret');
-
   let providedSecret = '';
   if (authHeader && authHeader.toLowerCase().startsWith('bearer ')) {
     providedSecret = authHeader.slice(7).trim();
-  } else if (cronSecretHeader) {
-    providedSecret = cronSecretHeader.trim();
-  } else if (secretQuery) {
-    providedSecret = secretQuery.trim();
   }
 
   if (!deps.cronSecret || providedSecret !== deps.cronSecret) {
     return new Response(
       JSON.stringify({
-        error: 'Unauthorized: invalid or missing cron secret',
+        error: 'Unauthorized: invalid or missing cron secret (Authorization: Bearer <CRON_SECRET> required)',
         code: 'CRON_UNAUTHORIZED',
       }),
       {
@@ -106,6 +98,20 @@ export async function handleSendReminders(
         continue;
       }
 
+      // Pre-claim reminder logs in database BEFORE sending to Telegram!
+      // This atomic claim guarantees that two concurrent cron workers cannot both send duplicate messages.
+      const recordsToClaim = itemsForPantry.map((item) => ({
+        user_id: user.telegram_id,
+        item_id: item.id,
+        stage: item.stage,
+      }));
+
+      const claimSuccess = await deps.db.recordReminderLogs(recordsToClaim);
+      if (!claimSuccess) {
+        // Already claimed by a concurrent worker
+        continue;
+      }
+
       // Format Telegram HTML message
       const htmlText = formatPantryReminderHtml(
         pantry.pantryName,
@@ -135,14 +141,7 @@ export async function handleSendReminders(
 
         if (tgRes.ok) {
           messagesSent++;
-          const recordsToLog = itemsForPantry.map((item) => ({
-            user_id: user.telegram_id,
-            item_id: item.id,
-            stage: item.stage,
-          }));
-
-          await deps.db.recordReminderLogs(recordsToLog);
-          loggedReminders += recordsToLog.length;
+          loggedReminders += recordsToClaim.length;
 
           // Add to local cache so subsequent pantries in same user won't duplicate if shared
           for (const item of itemsForPantry) {

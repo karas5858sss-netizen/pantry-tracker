@@ -58,6 +58,7 @@ describe('Stage 6: send-reminders Cron Worker', () => {
         for (const r of records) {
           mockReminderLogs.add(`${r.user_id}:${r.item_id}:${r.stage}`);
         }
+        return true;
       },
       async updateCanWritePm(userId: number, canWrite: boolean) {
         const u = mockUsers.find((user) => user.telegram_id === userId);
@@ -92,7 +93,7 @@ describe('Stage 6: send-reminders Cron Worker', () => {
       expect(resInvalid.status).toBe(401);
     });
 
-    it('accepts authorization via Bearer header, x-cron-secret, or query param', async () => {
+    it('strictly accepts authorization via Bearer header and rejects query-string secrets to prevent URL logging leaks', async () => {
       const reqBearer = new Request('https://example.com/send-reminders', {
         method: 'POST',
         headers: { Authorization: `Bearer ${TEST_CRON_SECRET}` },
@@ -100,18 +101,12 @@ describe('Stage 6: send-reminders Cron Worker', () => {
       const resBearer = await handleSendReminders(reqBearer, deps);
       expect(resBearer.status).toBe(200);
 
-      const reqHeader = new Request('https://example.com/send-reminders', {
-        method: 'POST',
-        headers: { 'x-cron-secret': TEST_CRON_SECRET },
-      });
-      const resHeader = await handleSendReminders(reqHeader, deps);
-      expect(resHeader.status).toBe(200);
-
+      // Rejects query parameter secrets to prevent URL exposure
       const reqQuery = new Request(`https://example.com/send-reminders?secret=${TEST_CRON_SECRET}`, {
         method: 'POST',
       });
       const resQuery = await handleSendReminders(reqQuery, deps);
-      expect(resQuery.status).toBe(200);
+      expect(resQuery.status).toBe(401);
     });
   });
 

@@ -119,16 +119,18 @@ const db: SendRemindersDb = {
     return set;
   },
 
-  async recordReminderLogs(records: Array<{ user_id: number; item_id: string; stage: number }>): Promise<void> {
-    if (records.length === 0) return;
+  async recordReminderLogs(records: Array<{ user_id: number; item_id: string; stage: number }>): Promise<boolean> {
+    if (records.length === 0) return true;
 
     const { error } = await supabase
       .from('reminder_log')
-      .insert(records, { defaultToNull: false });
+      .insert(records);
 
     if (error) {
-      console.error('Error inserting reminder logs:', error);
+      console.warn('Reminder logs already claimed or conflict:', error.message);
+      return false;
     }
+    return true;
   },
 
   async updateCanWritePm(userId: number, canWrite: boolean): Promise<void> {

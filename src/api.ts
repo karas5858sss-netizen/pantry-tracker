@@ -6,14 +6,6 @@
  * - NEVER references service role key.
  */
 
-import {
-  getOffApiUrl,
-  getOpfApiUrl,
-  getObfApiUrl,
-  getUpcItemDbUrl,
-  extractOffProductName,
-  extractUpcProductName,
-} from '@shared/products.ts';
 
 export interface SessionUser {
   telegram_id: number;
@@ -228,7 +220,7 @@ export async function lookupProduct(
   const cleanBarcode = barcode.trim();
   if (!cleanBarcode) return { found: false, product: null };
 
-  // 1. Try our backend (which checks local DB and server-side OFF fallback)
+  // Query backend: checks local DB products cache -> Open Food Facts -> auto-caches
   const res = await requestApi<{ found: boolean; product: ProductInfo | null }>(
     `/products/${encodeURIComponent(cleanBarcode)}?lang=${lang}`,
     { method: 'GET' }
@@ -236,50 +228,6 @@ export async function lookupProduct(
 
   if (res.data?.found && res.data.product) {
     return { found: true, product: res.data.product };
-  }
-
-  // 2. Direct client query to Open Food Facts, Open Products Facts, Open Beauty Facts, and UPCitemdb
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 4000);
-
-    const fetchJson = async (url: string) => {
-      try {
-        const res = await fetch(url, { signal: controller.signal, headers: { Accept: 'application/json' } });
-        if (!res.ok) return null;
-        return await res.json();
-      } catch {
-        return null;
-      }
-    };
-
-    const [offJson, opfJson, obfJson, upcJson] = await Promise.all([
-      fetchJson(getOffApiUrl(cleanBarcode)),
-      fetchJson(getOpfApiUrl(cleanBarcode)),
-      fetchJson(getObfApiUrl(cleanBarcode)),
-      fetchJson(getUpcItemDbUrl(cleanBarcode)),
-    ]);
-    clearTimeout(timeout);
-
-    const foundName =
-      extractOffProductName(offJson, lang) ||
-      extractOffProductName(opfJson, lang) ||
-      extractOffProductName(obfJson, lang) ||
-      extractUpcProductName(upcJson);
-
-    if (foundName) {
-      saveProduct(cleanBarcode, foundName, 'off').catch(() => {});
-      return {
-        found: true,
-        product: {
-          barcode: cleanBarcode,
-          name: foundName,
-          source: 'off',
-        },
-      };
-    }
-  } catch {
-    // Ignore client fetch errors and fall back to manual
   }
 
   return { found: false, product: null };

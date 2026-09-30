@@ -28,7 +28,7 @@ export interface SendRemindersDb {
   getEligibleUsers: () => Promise<EligibleUser[]>;
   getUserPantriesWithActiveItems: (userId: number) => Promise<PantryWithActiveItems[]>;
   getExistingReminderLogs: (userId: number, itemIds: string[]) => Promise<Set<string>>; // returns Set<`${item_id}:${stage}`>
-  recordReminderLogs: (records: Array<{ user_id: number; item_id: string; stage: number }>) => Promise<void>;
+  recordReminderLogs: (records: Array<{ user_id: number; item_id: string; stage: number }>) => Promise<boolean>;
   updateCanWritePm: (userId: number, canWrite: boolean) => Promise<void>;
 }
 

@@ -20,9 +20,17 @@ describe('Этап 8 (опционально). OCR даты: Guard and Acceptanc
       expect(fs.existsSync(coreWasmPath)).toBe(true);
       expect(fs.statSync(coreWasmPath).size).toBeGreaterThan(100000);
 
-      const langDataPath = path.join(tesseractDir, 'eng.traineddata.gz');
-      expect(fs.existsSync(langDataPath)).toBe(true);
-      expect(fs.statSync(langDataPath).size).toBeGreaterThan(1000000); // ~1.9 MB
+      const engPath = path.join(tesseractDir, 'eng.traineddata.gz');
+      expect(fs.existsSync(engPath)).toBe(true);
+      expect(fs.statSync(engPath).size).toBeGreaterThan(1000000); // ~1.9 MB
+
+      const rusPath = path.join(tesseractDir, 'rus.traineddata.gz');
+      expect(fs.existsSync(rusPath)).toBe(true);
+      expect(fs.statSync(rusPath).size).toBeGreaterThan(5000000); // ~8.2 MB
+
+      const spaPath = path.join(tesseractDir, 'spa.traineddata.gz');
+      expect(fs.existsSync(spaPath)).toBe(true);
+      expect(fs.statSync(spaPath).size).toBeGreaterThan(5000000); // ~8.0 MB
     });
 
     it('ensures no CDN URLs for tesseract exist in client code', () => {

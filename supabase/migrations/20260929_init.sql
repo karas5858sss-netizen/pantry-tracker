@@ -90,3 +90,103 @@ alter table pantry_invites enable row level security;
 alter table products enable row level security;
 alter table items enable row level security;
 alter table reminder_log enable row level security;
+
+-- 9. Atomic Operations for Pantry Items (Concurrency & Race-condition safe)
+
+-- Atomic Consume Item with row-level locking
+create or replace function consume_pantry_item(
+  p_item_id uuid,
+  p_action text default 'consumed',
+  p_all boolean default false
+)
+returns jsonb
+language plpgsql
+security definer
+as $$
+declare
+  v_item items%rowtype;
+  v_prev_qty int;
+  v_prev_status text;
+  v_prev_closed timestamptz;
+begin
+  -- Row lock to prevent concurrent decrement race conditions
+  select * into v_item
+  from items
+  where id = p_item_id
+  for update;
+
+  if not found or v_item.status != 'active' then
+    return null;
+  end if;
+
+  v_prev_qty := v_item.quantity;
+  v_prev_status := v_item.status;
+  v_prev_closed := v_item.closed_at;
+
+  if v_item.quantity > 1 and not p_all then
+    update items
+    set quantity = quantity - 1
+    where id = p_item_id
+    returning * into v_item;
+  else
+    update items
+    set status = p_action,
+        closed_at = now()
+    where id = p_item_id
+    returning * into v_item;
+  end if;
+
+  return jsonb_build_object(
+    'item', to_jsonb(v_item),
+    'previousState', jsonb_build_object(
+      'id', p_item_id,
+      'quantity', v_prev_qty,
+      'status', v_prev_status,
+      'closed_at', v_prev_closed
+    )
+  );
+end;
+$$;
+
+-- Atomic Merge or Create Item with row-level locking
+create or replace function merge_or_create_item(
+  p_pantry_id uuid,
+  p_barcode text,
+  p_name text,
+  p_expiration_date date,
+  p_quantity int,
+  p_created_by bigint
+)
+returns jsonb
+language plpgsql
+security definer
+as $$
+declare
+  v_item items%rowtype;
+begin
+  -- Lock candidate active batch
+  select * into v_item
+  from items
+  where pantry_id = p_pantry_id
+    and expiration_date = p_expiration_date
+    and status = 'active'
+    and (
+      (p_barcode is not null and barcode = p_barcode) or
+      (p_barcode is null and barcode is null and lower(name) = lower(p_name))
+    )
+  for update;
+
+  if found then
+    update items
+    set quantity = quantity + p_quantity
+    where id = v_item.id
+    returning * into v_item;
+    return jsonb_build_object('item', to_jsonb(v_item), 'merged', true);
+  else
+    insert into items (pantry_id, barcode, name, expiration_date, quantity, status, created_by)
+    values (p_pantry_id, p_barcode, p_name, p_expiration_date, p_quantity, 'active', p_created_by)
+    returning * into v_item;
+    return jsonb_build_object('item', to_jsonb(v_item), 'merged', false);
+  end if;
+end;
+$$;

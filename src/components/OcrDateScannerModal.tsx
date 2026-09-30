@@ -177,7 +177,8 @@ export const OcrDateScannerModal: React.FC<OcrDateScannerModalProps> = ({
         (p, status) => {
           setProgress(p);
           setStatusMessage(status);
-        }
+        },
+        lang
       );
 
       setRawText(result.rawText);
@@ -213,10 +214,15 @@ export const OcrDateScannerModal: React.FC<OcrDateScannerModalProps> = ({
     setPreviewUrl(url);
 
     try {
-      const result = await recognizeDateFromFile(file, undefined, (p, status) => {
-        setProgress(p);
-        setStatusMessage(status);
-      });
+      const result = await recognizeDateFromFile(
+        file,
+        undefined,
+        (p, status) => {
+          setProgress(p);
+          setStatusMessage(status);
+        },
+        lang
+      );
 
       setRawText(result.rawText);
       setCandidates(result.candidates);
