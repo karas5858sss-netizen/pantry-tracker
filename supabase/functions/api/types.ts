@@ -103,6 +103,8 @@ export interface DatabaseClient {
   ) => Promise<ItemRecord | null>;
   deleteItems: (itemIds: string[]) => Promise<void>;
   clearActivePantryItems: (pantryId: string) => Promise<void>;
+  mergeOrCreateItem?: (item: CreateItemData) => Promise<{ item: ItemRecord; merged: boolean }>;
+  consumePantryItemAtomic?: (itemId: string, action: 'consumed' | 'discarded', consumeAll: boolean) => Promise<{ item: ItemRecord; previousState: any } | null>;
 }
 
 export interface UpdateItemData {

@@ -528,6 +528,50 @@ const db: DatabaseClient = {
       throw new Error(`Failed to clear pantry items: ${error.message}`);
     }
   },
+
+  async mergeOrCreateItem(itemData: CreateItemData): Promise<{ item: ItemRecord; merged: boolean }> {
+    const { data, error } = await supabase.rpc('merge_or_create_item', {
+      p_pantry_id: itemData.pantry_id,
+      p_barcode: itemData.barcode ?? null,
+      p_name: itemData.name,
+      p_expiration_date: itemData.expiration_date,
+      p_quantity: itemData.quantity ?? 1,
+      p_created_by: itemData.created_by,
+    });
+
+    if (error || !data) {
+      // Fallback if RPC not active
+      const existing = await this.findActiveItem(itemData.pantry_id, itemData.expiration_date, itemData.barcode, itemData.name);
+      if (existing) {
+        const updated = await this.updateItem(existing.id, { quantity: existing.quantity + (itemData.quantity ?? 1) });
+        return { item: updated, merged: true };
+      }
+      const created = await this.createItem(itemData);
+      return { item: created, merged: false };
+    }
+
+    return {
+      item: data.item as ItemRecord,
+      merged: Boolean(data.merged),
+    };
+  },
+
+  async consumePantryItemAtomic(itemId: string, action: 'consumed' | 'discarded', consumeAll: boolean): Promise<{ item: ItemRecord; previousState: any } | null> {
+    const { data, error } = await supabase.rpc('consume_pantry_item', {
+      p_item_id: itemId,
+      p_action: action,
+      p_all: consumeAll,
+    });
+
+    if (error || !data) {
+      return null;
+    }
+
+    return {
+      item: data.item as ItemRecord,
+      previousState: data.previousState,
+    };
+  },
 };
 
 async function fetchOffProduct(barcode: string, lang: 'ru' | 'es' | 'en'): Promise<string | null> {

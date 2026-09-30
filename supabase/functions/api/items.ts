@@ -65,24 +65,34 @@ export async function handleCreateItem(
     );
   }
 
-  // Check if an active item with the same batch already exists in this pantry
-  const existingItem = await deps.db.findActiveItem(pantryId, expirationDate, barcode, name);
-  let item: ItemRecord;
+  const createData: CreateItemData = {
+    pantry_id: pantryId,
+    barcode,
+    name,
+    expiration_date: expirationDate,
+    quantity,
+    created_by: user.id,
+  };
 
-  if (existingItem) {
-    item = await deps.db.updateItem(existingItem.id, {
-      quantity: existingItem.quantity + quantity,
-    });
+  let item: ItemRecord;
+  let isMerged = false;
+
+  if (deps.db.mergeOrCreateItem) {
+    const res = await deps.db.mergeOrCreateItem(createData);
+    item = res.item;
+    isMerged = res.merged;
   } else {
-    const createData: CreateItemData = {
-      pantry_id: pantryId,
-      barcode,
-      name,
-      expiration_date: expirationDate,
-      quantity,
-      created_by: user.id,
-    };
-    item = await deps.db.createItem(createData);
+    // Fallback for mockDb / environments without RPC
+    const existingItem = await deps.db.findActiveItem(pantryId, expirationDate, barcode, name);
+    if (existingItem) {
+      item = await deps.db.updateItem(existingItem.id, {
+        quantity: existingItem.quantity + quantity,
+      });
+      isMerged = true;
+    } else {
+      item = await deps.db.createItem(createData);
+      isMerged = false;
+    }
   }
 
   // If a barcode was provided, also save product to catalog
@@ -96,7 +106,7 @@ export async function handleCreateItem(
 
   return new Response(
     JSON.stringify({ item }),
-    { status: existingItem ? 200 : 201, headers: { 'Content-Type': 'application/json' } }
+    { status: isMerged ? 200 : 201, headers: { 'Content-Type': 'application/json' } }
   );
 }
 
@@ -181,6 +191,21 @@ export async function handleConsumeItem(
 
   const body = await req.json().catch(() => ({}));
   const consumeAll = Boolean(body?.all);
+
+  // Use atomic row-level lock procedure if available
+  if (deps.db.consumePantryItemAtomic) {
+    const atomicRes = await deps.db.consumePantryItemAtomic(itemId, action, consumeAll);
+    if (atomicRes) {
+      return new Response(
+        JSON.stringify({
+          item: atomicRes.item,
+          previousState: atomicRes.previousState,
+          action,
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+  }
 
   const previousState = {
     id: item.id,

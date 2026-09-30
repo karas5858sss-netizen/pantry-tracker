@@ -16,6 +16,7 @@ interface ProductCardModalProps {
   format?: string;
   lang: SupportedLanguage;
   currentPantryId?: string;
+  initialExpirationDate?: string;
   onClose: () => void;
   onProductConfirmed?: (product: { barcode: string; name: string; quantity: number; expirationDate: string }) => void;
   onItemAdded?: (item: PantryItem) => void;
@@ -27,6 +28,7 @@ export const ProductCardModal: React.FC<ProductCardModalProps> = ({
   format,
   lang,
   currentPantryId,
+  initialExpirationDate,
   onClose,
   onProductConfirmed,
   onItemAdded,
@@ -65,10 +67,15 @@ export const ProductCardModal: React.FC<ProductCardModalProps> = ({
     setDateMode('exact');
     setMonthYearInput('');
 
-    // Default expiration date: +7 days
-    const defaultDate = addDays(new Date(), 7);
-    setExpirationDate(defaultDate);
-    setSelectedPreset('7d');
+    // Default expiration date: passed initial date or +7 days
+    if (initialExpirationDate) {
+      setExpirationDate(initialExpirationDate);
+      setSelectedPreset(null);
+    } else {
+      const defaultDate = addDays(new Date(), 7);
+      setExpirationDate(defaultDate);
+      setSelectedPreset('7d');
+    }
 
     lookupProduct(barcode, lang).then((res) => {
       setLoading(false);

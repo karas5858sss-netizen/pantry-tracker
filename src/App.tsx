@@ -58,6 +58,7 @@ export const App: React.FC = () => {
   const [isPantryModalOpen, setIsPantryModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isMainOcrOpen, setIsMainOcrOpen] = useState(false);
+  const [prefilledOcrDate, setPrefilledOcrDate] = useState<string | null>(null);
 
   // Language state
   const tgUser = typeof window !== 'undefined' ? window.Telegram?.WebApp?.initDataUnsafe?.user : undefined;
@@ -330,6 +331,24 @@ export const App: React.FC = () => {
         />
       )}
 
+      {activeSection === 'inventory' && !currentPantry && !sessionLoading && (
+        <div className="w-full p-6 bg-tg-secondary border border-tg-hint/20 rounded-2xl text-center space-y-3">
+          <div className="text-4xl">📦</div>
+          <h2 className="font-bold text-sm text-tg-text">{t(lang, 'pantry_create_title')}</h2>
+          <p className="text-xs text-tg-hint">{t(lang, 'item_no_pantry')}</p>
+          <button
+            type="button"
+            onClick={() => {
+              setIsPantryModalOpen(true);
+              triggerHaptic('light');
+            }}
+            className="py-2.5 px-4 bg-tg-button text-tg-button font-bold text-xs rounded-xl shadow-sm active:scale-95 transition"
+          >
+            ➕ {t(lang, 'pantry_create_btn')}
+          </button>
+        </div>
+      )}
+
       {/* SECTION 2: SCANNER VIEW */}
       {activeSection === 'scanner' && (
         <div className="w-full space-y-3">
@@ -545,15 +564,21 @@ export const App: React.FC = () => {
           format={currentResult?.format}
           lang={lang}
           currentPantryId={currentPantry?.id}
-          onClose={() => setIsProductModalOpen(false)}
+          initialExpirationDate={prefilledOcrDate || undefined}
+          onClose={() => {
+            setIsProductModalOpen(false);
+            setPrefilledOcrDate(null);
+          }}
           onItemAdded={(item) => {
             setToastMessage(`✓ «${item.name}» (${item.quantity} шт.) добавлен на склад (до ${item.expiration_date})!`);
             triggerHaptic('success');
+            setPrefilledOcrDate(null);
             setTimeout(() => setToastMessage(null), 3500);
             setInventoryRefreshKey((k) => k + 1);
           }}
           onProductConfirmed={(p) => {
             setToastMessage(`✓ Товар «${p.name}» (${p.quantity} шт.) подтвержден!`);
+            setPrefilledOcrDate(null);
             setTimeout(() => setToastMessage(null), 3500);
           }}
         />
@@ -590,9 +615,10 @@ export const App: React.FC = () => {
         lang={lang}
         onClose={() => setIsMainOcrOpen(false)}
         onDateSelected={(dateIso) => {
-          setToastMessage(`✓ Дата распознана: ${dateIso}`);
+          setPrefilledOcrDate(dateIso);
+          setToastMessage(`✓ Срок годности ${dateIso} сохранён. Теперь отсканируйте товар!`);
           triggerHaptic('success');
-          setTimeout(() => setToastMessage(null), 3500);
+          setTimeout(() => setToastMessage(null), 4000);
         }}
       />
     </div>
