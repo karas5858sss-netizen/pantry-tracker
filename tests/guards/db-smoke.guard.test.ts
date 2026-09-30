@@ -10,15 +10,19 @@ import { describe, it, expect, beforeAll } from 'vitest';
  *    with service role privileges.
  */
 
-const SUPABASE_URL =
-  process.env.SUPABASE_URL ||
-  process.env.VITE_SUPABASE_URL ||
-  'https://hvyotkemriptfbeeczlu.supabase.co';
+// These must be provided via environment variables — no production fallback.
+// In CI the `db-smoke` job sets them from `supabase status -o json`.
+// Locally: run `supabase start` first, then set SUPABASE_URL and SUPABASE_ANON_KEY.
+const SUPABASE_URL = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL ?? '';
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY ?? process.env.VITE_SUPABASE_ANON_KEY ?? '';
 
-const SUPABASE_ANON_KEY =
-  process.env.SUPABASE_ANON_KEY ||
-  process.env.VITE_SUPABASE_ANON_KEY ||
-  'sb_publishable_EXHwpQCJMgo6hefwKE5wkA_sNFJrz6i';
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  throw new Error(
+    '[db-smoke] SUPABASE_URL and SUPABASE_ANON_KEY must be set.\n' +
+    'Run `supabase start` first, then export SUPABASE_URL and SUPABASE_ANON_KEY from `supabase status`.\n' +
+    'This test must NOT run via `npm test` — use `npm run test:smoke` instead.'
+  );
+}
 
 interface TableDefinition {
   name: string;
@@ -77,29 +81,23 @@ const TABLES: TableDefinition[] = [
 ];
 
 describe('Database Smoke-Test: RLS Enforcement with Public Anon Key', () => {
-  let isReachable = false;
-
+  // Verify the endpoint is truly reachable before running tests.
+  // Unlike unit tests, this one must fail loudly if DB is unreachable.
   beforeAll(async () => {
-    try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/`, {
-        headers: {
-          apikey: SUPABASE_ANON_KEY,
-          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-        },
-      });
-      isReachable = res.status < 500;
-    } catch {
-      isReachable = false;
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/`, {
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      },
+    });
+    if (res.status >= 500) {
+      throw new Error(`[db-smoke] Supabase at ${SUPABASE_URL} returned ${res.status}. Is it running?`);
     }
   });
 
   for (const { name, insertPayload } of TABLES) {
     describe(`Table: "${name}"`, () => {
       it(`blocks SELECT query with anon key (returns 0 rows / empty array)`, async () => {
-        if (!isReachable) {
-          console.warn(`[db-smoke] Supabase endpoint not reachable at ${SUPABASE_URL}. Skipping live query.`);
-          return;
-        }
 
         const res = await fetch(`${SUPABASE_URL}/rest/v1/${name}?select=*`, {
           headers: {
@@ -115,7 +113,6 @@ describe('Database Smoke-Test: RLS Enforcement with Public Anon Key', () => {
       });
 
       it(`rejects direct INSERT with anon key via RLS violation (42501)`, async () => {
-        if (!isReachable) return;
 
         const res = await fetch(`${SUPABASE_URL}/rest/v1/${name}`, {
           method: 'POST',

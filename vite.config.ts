@@ -18,5 +18,12 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
+    // db-smoke test requires a live Supabase instance.
+    // Run it separately via `npm run test:smoke` (CI: db-smoke job).
+    exclude: [
+      '**/node_modules/**',
+      '**/dist/**',
+      '**/tests/guards/db-smoke.guard.test.ts',
+    ],
   },
 })
