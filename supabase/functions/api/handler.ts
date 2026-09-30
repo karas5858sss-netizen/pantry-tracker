@@ -18,6 +18,7 @@ import {
   handleConsumeItem,
   handleRestoreItem,
   handleUpdateItemQuantity,
+  handleClearPantryItems,
   handleConsumeBarcodeFifo,
 } from './items.ts';
 
@@ -200,6 +201,14 @@ export async function handleApiRequest(req: Request, deps: ApiDependencies): Pro
     const pantryId = updateItemPatchMatch[1];
     const itemId = updateItemPatchMatch[2];
     const res = await handleUpdateItemQuantity(user, pantryId, itemId, req, deps);
+    return addCors(res);
+  }
+
+  // Route: POST /pantries/:id/items/clear (clear all active items in pantry)
+  const clearItemsMatch = pathname.match(/^\/pantries\/([^/]+)\/items\/clear$/);
+  if (clearItemsMatch && req.method === 'POST') {
+    const pantryId = clearItemsMatch[1];
+    const res = await handleClearPantryItems(user, pantryId, deps);
     return addCors(res);
   }
 

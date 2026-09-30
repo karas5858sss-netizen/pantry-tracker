@@ -260,6 +260,15 @@ function createMockDb(): DatabaseClient & {
       itemsList.length = 0;
       itemsList.push(...remaining);
     },
+
+    async clearActivePantryItems(pantryId: string): Promise<void> {
+      for (const item of itemsList) {
+        if (item.pantry_id === pantryId && item.status === 'active') {
+          item.status = 'discarded';
+          item.closed_at = new Date().toISOString();
+        }
+      }
+    },
   };
 }
 
@@ -645,6 +654,15 @@ describe('Stage 4: Items & Expiration Dates API', () => {
           quantity: -3,
         });
         expect(res.status).toBe(400);
+      });
+
+      it('clears all active items in pantry via POST /pantries/:id/items/clear', async () => {
+        const res = await makeAuthRequest(ownerUser, 'POST', '/pantries/pantry-1/items/clear');
+        expect(res.status).toBe(200);
+
+        const listRes = await makeAuthRequest(ownerUser, 'GET', '/pantries/pantry-1/items');
+        const listData = await listRes.json();
+        expect(listData.items).toHaveLength(0);
       });
     });
 

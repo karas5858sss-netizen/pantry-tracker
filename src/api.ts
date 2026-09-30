@@ -442,3 +442,15 @@ export async function consumeBarcodeFifo(
   });
 }
 
+/**
+ * Clears all active items from the pantry.
+ */
+export async function clearPantryItems(
+  pantryId: string
+): Promise<{ data?: { success: boolean }; error?: ApiError }> {
+  return requestApi<{ success: boolean }>(`/pantries/${pantryId}/items/clear`, {
+    method: 'POST',
+  });
+}
+
+

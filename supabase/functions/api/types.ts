@@ -95,6 +95,7 @@ export interface DatabaseClient {
     name?: string
   ) => Promise<ItemRecord | null>;
   deleteItems: (itemIds: string[]) => Promise<void>;
+  clearActivePantryItems: (pantryId: string) => Promise<void>;
 }
 
 export interface UpdateItemData {

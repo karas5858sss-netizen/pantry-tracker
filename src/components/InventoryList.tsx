@@ -6,6 +6,7 @@ import {
   consumeItem,
   restoreItem,
   updateItemQuantity,
+  clearPantryItems,
 } from '../api.ts';
 import { t, type SupportedLanguage } from '@shared/i18n.ts';
 import { getItemFreshness, sortItemsByFifo } from '@shared/inventory.ts';
@@ -69,11 +70,11 @@ export const InventoryList: React.FC<InventoryListProps> = ({
     return () => clearInterval(interval);
   }, [undoState]);
 
-  const handleAction = async (item: PantryItem, action: 'consumed' | 'discarded') => {
+  const handleAction = async (item: PantryItem, action: 'consumed' | 'discarded', all: boolean = false) => {
     setActionInProgressId(item.id);
     triggerHaptic('heavy');
 
-    const res = await consumeItem(pantryId, item.id, action);
+    const res = await consumeItem(pantryId, item.id, action, all);
     setActionInProgressId(null);
 
     if (res.error) {
@@ -101,6 +102,27 @@ export const InventoryList: React.FC<InventoryListProps> = ({
       });
       triggerHaptic('light');
     }
+  };
+
+  const handleClearAll = async () => {
+    if (items.length === 0) return;
+    const confirmed = window.confirm(t(lang, 'inventory_clear_confirm'));
+    if (!confirmed) return;
+
+    triggerHaptic('heavy');
+    setLoading(true);
+    const res = await clearPantryItems(pantryId);
+    setLoading(false);
+
+    if (res.error) {
+      triggerHaptic('error');
+      alert(res.error.error || 'Ошибка очистки склада');
+      return;
+    }
+
+    triggerHaptic('success');
+    setItems([]);
+    setUndoState(null);
   };
 
   const handleUndo = async () => {
@@ -276,25 +298,39 @@ export const InventoryList: React.FC<InventoryListProps> = ({
           )}
         </div>
 
-        {/* Freshness Stats Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto py-0.5 text-[11px] font-semibold">
-          <span className="px-2.5 py-1 rounded-xl bg-tg-secondary border border-tg-hint/15 text-tg-text whitespace-nowrap">
-            📦 {items.length} {t(lang, 'inventory_count_items')} ({stats.totalQty} шт.)
-          </span>
-          {stats.expiredCount > 0 && (
-            <span className="px-2.5 py-1 rounded-xl bg-red-500/15 border border-red-500/25 text-red-500 whitespace-nowrap font-bold">
-              🔴 {stats.expiredCount} просрочено
+        {/* Freshness Stats Pills & Clear All */}
+        <div className="flex items-center justify-between gap-2 overflow-x-auto py-0.5 text-[11px] font-semibold">
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className="px-2.5 py-1 rounded-xl bg-tg-secondary border border-tg-hint/15 text-tg-text whitespace-nowrap">
+              📦 {items.length} {t(lang, 'inventory_count_items')} ({stats.totalQty} шт.)
             </span>
-          )}
-          {stats.warningCount > 0 && (
-            <span className="px-2.5 py-1 rounded-xl bg-amber-500/15 border border-amber-500/25 text-amber-500 whitespace-nowrap font-bold">
-              🟡 {stats.warningCount} ≤ 3 дн.
-            </span>
-          )}
-          {stats.freshCount > 0 && (
-            <span className="px-2.5 py-1 rounded-xl bg-emerald-500/15 border border-emerald-500/25 text-emerald-500 whitespace-nowrap font-bold">
-              🟢 {stats.freshCount} свежих
-            </span>
+            {stats.expiredCount > 0 && (
+              <span className="px-2.5 py-1 rounded-xl bg-red-500/15 border border-red-500/25 text-red-500 whitespace-nowrap font-bold">
+                🔴 {stats.expiredCount} просрочено
+              </span>
+            )}
+            {stats.warningCount > 0 && (
+              <span className="px-2.5 py-1 rounded-xl bg-amber-500/15 border border-amber-500/25 text-amber-500 whitespace-nowrap font-bold">
+                🟡 {stats.warningCount} ≤ 3 дн.
+              </span>
+            )}
+            {stats.freshCount > 0 && (
+              <span className="px-2.5 py-1 rounded-xl bg-emerald-500/15 border border-emerald-500/25 text-emerald-500 whitespace-nowrap font-bold">
+                🟢 {stats.freshCount} свежих
+              </span>
+            )}
+          </div>
+
+          {items.length > 0 && (
+            <button
+              type="button"
+              onClick={handleClearAll}
+              className="py-1 px-2.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 text-[10px] font-bold whitespace-nowrap shrink-0 transition active:scale-95 flex items-center gap-1"
+              title={t(lang, 'inventory_clear_all')}
+            >
+              <span>🗑️</span>
+              <span>{t(lang, 'inventory_clear_all')}</span>
+            </button>
           )}
         </div>
       </div>
@@ -432,10 +468,10 @@ export const InventoryList: React.FC<InventoryListProps> = ({
                     <button
                       type="button"
                       disabled={isProcessing}
-                      onClick={() => handleAction(item, 'discarded')}
+                      onClick={() => handleAction(item, 'discarded', true)}
                       className="py-1 px-2 rounded-xl bg-tg-bg hover:bg-red-500/15 border border-tg-hint/20 hover:border-red-500/30 text-tg-hint hover:text-red-500 text-[12px] transition active:scale-95 disabled:opacity-50 flex items-center justify-center"
-                      title={t(lang, 'item_action_discard')}
-                      aria-label={t(lang, 'item_action_discard')}
+                      title={t(lang, 'item_action_discard_all')}
+                      aria-label={t(lang, 'item_action_discard_all')}
                     >
                       <span>🗑️</span>
                     </button>

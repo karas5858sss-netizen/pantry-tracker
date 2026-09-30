@@ -467,3 +467,33 @@ export async function handleConsumeBarcodeFifo(
   );
 }
 
+export async function handleClearPantryItems(
+  user: TelegramUser,
+  pantryId: string,
+  deps: ApiDependencies
+): Promise<Response> {
+  const isAllowed = await deps.db.isUserAllowed(user.id);
+  if (!isAllowed) {
+    return new Response(
+      JSON.stringify({ error: 'Доступ запрещен', code: 'NOT_ALLOWED' }),
+      { status: 403, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+
+  const membership = await deps.db.getUserPantryMembership(pantryId, user.id);
+  if (!membership) {
+    return new Response(
+      JSON.stringify({ error: 'У вас нет доступа к этому складу', code: 'FORBIDDEN' }),
+      { status: 403, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+
+  await deps.db.clearActivePantryItems(pantryId);
+
+  return new Response(
+    JSON.stringify({ success: true }),
+    { status: 200, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+
+

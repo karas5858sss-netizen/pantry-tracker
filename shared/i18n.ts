@@ -127,6 +127,9 @@ export const translations = {
     fifo_recommended: 'FIFO (ранний срок)',
     fifo_not_found: 'Товар с таким штрихкодом не найден на складе',
     fifo_confirm_btn: 'Списать выбранный',
+    inventory_clear_all: 'Очистить всё',
+    inventory_clear_confirm: 'Вы уверены, что хотите удалить все товары со склада?',
+    item_action_discard_all: 'Удалить позицию целиком',
 
     // Common
     btn_retry: 'Повторить',
@@ -256,6 +259,9 @@ export const translations = {
     fifo_recommended: 'FIFO (más temprano)',
     fifo_not_found: 'Producto no encontrado en esta despensa',
     fifo_confirm_btn: 'Dar de baja seleccionado',
+    inventory_clear_all: 'Vaciar todo',
+    inventory_clear_confirm: '¿Seguro que deseas eliminar todos los productos?',
+    item_action_discard_all: 'Eliminar lote completo',
 
     // Common
     btn_retry: 'Reintentar',
@@ -385,6 +391,9 @@ export const translations = {
     fifo_recommended: 'FIFO (earliest)',
     fifo_not_found: 'Product not found in this pantry',
     fifo_confirm_btn: 'Consume selected',
+    inventory_clear_all: 'Clear all',
+    inventory_clear_confirm: 'Are you sure you want to clear all items from pantry?',
+    item_action_discard_all: 'Delete entire position',
 
     // Common
     btn_retry: 'Retry',

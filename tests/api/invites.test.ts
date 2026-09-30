@@ -238,6 +238,7 @@ function createMockDb(): DatabaseClient & {
       return null;
     },
     async deleteItems(_itemIds: string[]): Promise<void> {},
+    async clearActivePantryItems(_pantryId: string): Promise<void> {},
   };
 }
 

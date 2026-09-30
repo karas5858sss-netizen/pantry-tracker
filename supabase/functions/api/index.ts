@@ -489,6 +489,19 @@ const db: DatabaseClient = {
       console.error('Error deleting duplicate items:', error);
     }
   },
+
+  async clearActivePantryItems(pantryId: string): Promise<void> {
+    const { error } = await supabase
+      .from('items')
+      .update({ status: 'discarded', closed_at: new Date().toISOString() })
+      .eq('pantry_id', pantryId)
+      .eq('status', 'active');
+
+    if (error) {
+      console.error('Error clearing active pantry items:', error);
+      throw new Error(`Failed to clear pantry items: ${error.message}`);
+    }
+  },
 };
 
 async function fetchOffProduct(barcode: string, lang: 'ru' | 'es' | 'en'): Promise<string | null> {
