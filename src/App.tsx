@@ -179,10 +179,10 @@ export const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-tg-bg text-tg-text flex flex-col items-center px-4 py-3 sm:py-6 max-w-md mx-auto">
+    <div className="min-h-screen bg-tg-bg text-tg-text flex flex-col items-center px-4 safe-area-top-padding safe-area-bottom-padding max-w-md mx-auto">
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed top-3 left-4 right-4 z-50 p-3 bg-emerald-500 text-white rounded-2xl shadow-lg text-xs font-semibold text-center animate-bounce-short">
+        <div className="fixed safe-area-toast-top left-4 right-4 z-50 p-3 bg-emerald-500 text-white rounded-2xl shadow-lg text-xs font-semibold text-center animate-bounce-short">
           {toastMessage}
         </div>
       )}

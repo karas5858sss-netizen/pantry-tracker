@@ -99,3 +99,15 @@ body {
 .scan-laser {
   animation: scan-line 2.2s ease-in-out infinite;
 }
+
+/* Safe area padding utilities for mobile devices & Telegram Mini App */
+.safe-area-top-padding {
+  padding-top: max(calc(env(safe-area-inset-top, 0px) + 20px), 36px);
+}
+.safe-area-bottom-padding {
+  padding-bottom: max(calc(env(safe-area-inset-bottom, 0px) + 16px), 24px);
+}
+.safe-area-toast-top {
+  top: max(calc(env(safe-area-inset-top, 0px) + 16px), 28px);
+}
+
