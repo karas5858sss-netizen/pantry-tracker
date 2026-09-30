@@ -1,19 +1,52 @@
 import { describe, it, expect } from 'vitest';
 import {
   extractOffProductName,
+  extractUpcProductName,
   cleanProductName,
   getOffApiUrl,
+  getOpfApiUrl,
+  getObfApiUrl,
+  getUpcItemDbUrl,
   OFF_USER_AGENT,
 } from '../../shared/products.ts';
 
-describe('Shared Products & Open Food Facts parsing', () => {
-  it('builds proper Open Food Facts v2 API url', () => {
+describe('Shared Products & Multi-database parsing', () => {
+  it('builds proper API urls for all providers', () => {
     expect(getOffApiUrl('4607004891118')).toBe(
       'https://world.openfoodfacts.org/api/v2/product/4607004891118.json'
     );
-    expect(getOffApiUrl('  4006381333931  ')).toBe(
-      'https://world.openfoodfacts.org/api/v2/product/4006381333931.json'
+    expect(getOpfApiUrl('4006381333931')).toBe(
+      'https://world.openproductsfacts.org/api/v2/product/4006381333931.json'
     );
+    expect(getObfApiUrl('3600523724832')).toBe(
+      'https://world.openbeautyfacts.org/api/v2/product/3600523724832.json'
+    );
+    expect(getUpcItemDbUrl('4006381333931')).toBe(
+      'https://api.upcitemdb.com/prod/trial/lookup?upc=4006381333931'
+    );
+  });
+
+  describe('extractUpcProductName', () => {
+    it('returns null on invalid response', () => {
+      expect(extractUpcProductName(null)).toBeNull();
+      expect(extractUpcProductName({})).toBeNull();
+      expect(extractUpcProductName({ code: 'INVALID' })).toBeNull();
+      expect(extractUpcProductName({ code: 'OK', items: [] })).toBeNull();
+    });
+
+    it('extracts and cleans title from UPCitemdb items', () => {
+      const upcData = {
+        code: 'OK',
+        total: 1,
+        items: [
+          {
+            title: '  Stabilo Point 88 Fineliner Marker Pen  ',
+            brand: 'STABILO',
+          },
+        ],
+      };
+      expect(extractUpcProductName(upcData)).toBe('Stabilo Point 88 Fineliner Marker Pen');
+    });
   });
 
   it('defines valid non-empty user-agent', () => {

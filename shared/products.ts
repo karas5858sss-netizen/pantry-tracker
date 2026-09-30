@@ -39,6 +39,42 @@ export function getOffApiUrl(barcode: string): string {
 }
 
 /**
+ * Returns the Open Products Facts API v2 endpoint (non-food household goods).
+ */
+export function getOpfApiUrl(barcode: string): string {
+  const cleanBarcode = barcode.trim();
+  return `https://world.openproductsfacts.org/api/v2/product/${encodeURIComponent(cleanBarcode)}.json`;
+}
+
+/**
+ * Returns the Open Beauty Facts API v2 endpoint (cosmetics & personal hygiene).
+ */
+export function getObfApiUrl(barcode: string): string {
+  const cleanBarcode = barcode.trim();
+  return `https://world.openbeautyfacts.org/api/v2/product/${encodeURIComponent(cleanBarcode)}.json`;
+}
+
+/**
+ * Returns the UPCitemdb lookup endpoint (general retail products).
+ */
+export function getUpcItemDbUrl(barcode: string): string {
+  const cleanBarcode = barcode.trim();
+  return `https://api.upcitemdb.com/prod/trial/lookup?upc=${encodeURIComponent(cleanBarcode)}`;
+}
+
+/**
+ * Extracts product name from UPCitemdb response.
+ */
+export function extractUpcProductName(data: unknown): string | null {
+  if (!data || typeof data !== 'object') return null;
+  const upc = data as { code?: string; items?: Array<{ title?: string }> };
+  if (upc.code === 'OK' && Array.isArray(upc.items) && upc.items.length > 0) {
+    return cleanProductName(upc.items[0]?.title);
+  }
+  return null;
+}
+
+/**
  * Cleans up and normalizes product name.
  */
 export function cleanProductName(name?: string | null): string | null {

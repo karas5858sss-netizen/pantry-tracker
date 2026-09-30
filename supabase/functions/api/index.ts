@@ -18,7 +18,11 @@ import type {
 } from './types.ts';
 import {
   getOffApiUrl,
+  getOpfApiUrl,
+  getObfApiUrl,
+  getUpcItemDbUrl,
   extractOffProductName,
+  extractUpcProductName,
   OFF_USER_AGENT,
 } from '../../../shared/products.ts';
 
@@ -347,26 +351,63 @@ const db: DatabaseClient = {
 };
 
 async function fetchOffProduct(barcode: string, lang: 'ru' | 'es' | 'en'): Promise<string | null> {
-  try {
-    const url = getOffApiUrl(barcode);
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 3500);
+  const cleanBarcode = barcode.trim();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 4000);
 
-    const res = await fetch(url, {
-      signal: controller.signal,
-      headers: {
+  const fetchJson = async (url: string, headers: Record<string, string> = {}) => {
+    try {
+      const res = await fetch(url, { signal: controller.signal, headers });
+      if (!res.ok) return null;
+      return await res.json();
+    } catch {
+      return null;
+    }
+  };
+
+  try {
+    // Query all 4 external databases in parallel
+    const [offJson, opfJson, obfJson, upcJson] = await Promise.all([
+      fetchJson(getOffApiUrl(cleanBarcode), {
         'User-Agent': OFF_USER_AGENT,
         Accept: 'application/json',
-      },
-    });
+      }),
+      fetchJson(getOpfApiUrl(cleanBarcode), {
+        'User-Agent': OFF_USER_AGENT,
+        Accept: 'application/json',
+      }),
+      fetchJson(getObfApiUrl(cleanBarcode), {
+        'User-Agent': OFF_USER_AGENT,
+        Accept: 'application/json',
+      }),
+      fetchJson(getUpcItemDbUrl(cleanBarcode), {
+        Accept: 'application/json',
+      }),
+    ]);
     clearTimeout(timeout);
 
-    if (!res.ok) return null;
-    const data = await res.json();
-    return extractOffProductName(data, lang);
-  } catch (err) {
-    console.warn(`[OFF fetch warning for ${barcode}]:`, err);
+    // 1. Food products (localized)
+    const offName = extractOffProductName(offJson, lang);
+    if (offName) return offName;
+
+    // 2. Non-food products (household, tools)
+    const opfName = extractOffProductName(opfJson, lang);
+    if (opfName) return opfName;
+
+    // 3. Beauty & hygiene (cosmetics, soaps)
+    const obfName = extractOffProductName(obfJson, lang);
+    if (obfName) return obfName;
+
+    // 4. UPCitemdb general retail catalog
+    const upcName = extractUpcProductName(upcJson);
+    if (upcName) return upcName;
+
     return null;
+  } catch (err) {
+    console.warn(`[Multi-DB fetch warning for ${barcode}]:`, err);
+    return null;
+  } finally {
+    clearTimeout(timeout);
   }
 }
 

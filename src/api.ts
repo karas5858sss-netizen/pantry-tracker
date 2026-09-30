@@ -6,6 +6,15 @@
  * - NEVER references service role key.
  */
 
+import {
+  getOffApiUrl,
+  getOpfApiUrl,
+  getObfApiUrl,
+  getUpcItemDbUrl,
+  extractOffProductName,
+  extractUpcProductName,
+} from '@shared/products.ts';
+
 export interface SessionUser {
   telegram_id: number;
   first_name: string;
@@ -229,47 +238,45 @@ export async function lookupProduct(
     return { found: true, product: res.data.product };
   }
 
-  // 2. Direct client query to Open Food Facts if backend returned not found
+  // 2. Direct client query to Open Food Facts, Open Products Facts, Open Beauty Facts, and UPCitemdb
   try {
-    const offUrl = `https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(cleanBarcode)}.json`;
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 3500);
+    const timeout = setTimeout(() => controller.abort(), 4000);
 
-    const offRes = await fetch(offUrl, {
-      signal: controller.signal,
-      headers: {
-        Accept: 'application/json',
-      },
-    });
+    const fetchJson = async (url: string) => {
+      try {
+        const res = await fetch(url, { signal: controller.signal, headers: { Accept: 'application/json' } });
+        if (!res.ok) return null;
+        return await res.json();
+      } catch {
+        return null;
+      }
+    };
+
+    const [offJson, opfJson, obfJson, upcJson] = await Promise.all([
+      fetchJson(getOffApiUrl(cleanBarcode)),
+      fetchJson(getOpfApiUrl(cleanBarcode)),
+      fetchJson(getObfApiUrl(cleanBarcode)),
+      fetchJson(getUpcItemDbUrl(cleanBarcode)),
+    ]);
     clearTimeout(timeout);
 
-    if (offRes.ok) {
-      const offJson = await offRes.json();
-      // Dynamically import or extract
-      const prod = offJson?.product;
-      if (offJson?.status === 1 && prod) {
-        const langKey = `product_name_${lang}`;
-        const nameCandidate =
-          prod[langKey] ||
-          prod.product_name ||
-          prod[`generic_name_${lang}`] ||
-          prod.generic_name ||
-          prod.product_name_en;
+    const foundName =
+      extractOffProductName(offJson, lang) ||
+      extractOffProductName(opfJson, lang) ||
+      extractOffProductName(obfJson, lang) ||
+      extractUpcProductName(upcJson);
 
-        if (nameCandidate && typeof nameCandidate === 'string' && nameCandidate.trim()) {
-          const cleanName = nameCandidate.trim();
-          // Cache in our DB for future scans
-          saveProduct(cleanBarcode, cleanName, 'off').catch(() => {});
-          return {
-            found: true,
-            product: {
-              barcode: cleanBarcode,
-              name: cleanName,
-              source: 'off',
-            },
-          };
-        }
-      }
+    if (foundName) {
+      saveProduct(cleanBarcode, foundName, 'off').catch(() => {});
+      return {
+        found: true,
+        product: {
+          barcode: cleanBarcode,
+          name: foundName,
+          source: 'off',
+        },
+      };
     }
   } catch {
     // Ignore client fetch errors and fall back to manual
