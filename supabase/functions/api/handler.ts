@@ -17,6 +17,7 @@ import {
   handleGetPantryItems,
   handleConsumeItem,
   handleRestoreItem,
+  handleUpdateItemQuantity,
   handleConsumeBarcodeFifo,
 } from './items.ts';
 
@@ -181,6 +182,24 @@ export async function handleApiRequest(req: Request, deps: ApiDependencies): Pro
     const pantryId = restoreItemMatch[1];
     const itemId = restoreItemMatch[2];
     const res = await handleRestoreItem(user, pantryId, itemId, req, deps);
+    return addCors(res);
+  }
+
+  // Route: POST /pantries/:id/items/:itemId/quantity (set exact quantity)
+  const updateQtyPostMatch = pathname.match(/^\/pantries\/([^/]+)\/items\/([^/]+)\/quantity$/);
+  if (updateQtyPostMatch && req.method === 'POST') {
+    const pantryId = updateQtyPostMatch[1];
+    const itemId = updateQtyPostMatch[2];
+    const res = await handleUpdateItemQuantity(user, pantryId, itemId, req, deps);
+    return addCors(res);
+  }
+
+  // Route: PATCH /pantries/:id/items/:itemId (update item fields, e.g. quantity)
+  const updateItemPatchMatch = pathname.match(/^\/pantries\/([^/]+)\/items\/([^/]+)$/);
+  if (updateItemPatchMatch && req.method === 'PATCH') {
+    const pantryId = updateItemPatchMatch[1];
+    const itemId = updateItemPatchMatch[2];
+    const res = await handleUpdateItemQuantity(user, pantryId, itemId, req, deps);
     return addCors(res);
   }
 

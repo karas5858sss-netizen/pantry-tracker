@@ -5,6 +5,7 @@ import {
   getPantryItems,
   consumeItem,
   restoreItem,
+  updateItemQuantity,
 } from '../api.ts';
 import { t, type SupportedLanguage } from '@shared/i18n.ts';
 import { getItemFreshness, sortItemsByFifo } from '@shared/inventory.ts';
@@ -119,6 +120,84 @@ export const InventoryList: React.FC<InventoryListProps> = ({
     if (res.data?.item) {
       triggerHaptic('success');
       loadItems();
+    }
+  };
+
+  const handleStepQuantity = async (item: PantryItem, delta: number) => {
+    const newQty = item.quantity + delta;
+    if (newQty < 0) return;
+
+    if (newQty === 0) {
+      // Decrementing to 0 triggers standard consume with 5-second undo
+      await handleAction(item, 'consumed');
+      return;
+    }
+
+    setActionInProgressId(item.id);
+    triggerHaptic('light');
+
+    // Optimistic update
+    setItems((prev) =>
+      prev.map((i) => (i.id === item.id ? { ...i, quantity: newQty } : i))
+    );
+
+    const res = await updateItemQuantity(pantryId, item.id, newQty);
+    setActionInProgressId(null);
+
+    if (res.error) {
+      triggerHaptic('error');
+      alert(res.error.error || 'Ошибка изменения количества');
+      loadItems();
+      return;
+    }
+
+    if (res.data?.item) {
+      setItems((prev) =>
+        prev.map((i) => (i.id === item.id ? { ...i, quantity: res.data!.item.quantity } : i))
+      );
+    }
+  };
+
+  const handlePromptQuantity = async (item: PantryItem) => {
+    const input = prompt(`Изменить количество для «${item.name}» (шт.):`, String(item.quantity));
+    if (input === null) return;
+
+    const parsed = parseInt(input.trim(), 10);
+    if (isNaN(parsed) || parsed < 0) {
+      alert('Пожалуйста, введите положительное целое число');
+      return;
+    }
+
+    if (parsed === item.quantity) return;
+
+    if (parsed === 0) {
+      await handleAction(item, 'consumed');
+      return;
+    }
+
+    setActionInProgressId(item.id);
+    triggerHaptic('light');
+
+    // Optimistic update
+    setItems((prev) =>
+      prev.map((i) => (i.id === item.id ? { ...i, quantity: parsed } : i))
+    );
+
+    const res = await updateItemQuantity(pantryId, item.id, parsed);
+    setActionInProgressId(null);
+
+    if (res.error) {
+      triggerHaptic('error');
+      alert(res.error.error || 'Ошибка изменения количества');
+      loadItems();
+      return;
+    }
+
+    if (res.data?.item) {
+      triggerHaptic('success');
+      setItems((prev) =>
+        prev.map((i) => (i.id === item.id ? { ...i, quantity: res.data!.item.quantity } : i))
+      );
     }
   };
 
@@ -300,9 +379,36 @@ export const InventoryList: React.FC<InventoryListProps> = ({
                     )}
                   </div>
 
-                  <span className="px-2.5 py-1 rounded-xl bg-tg-bg border border-tg-hint/20 font-bold text-xs text-tg-text shrink-0">
-                    {item.quantity} шт.
-                  </span>
+                  {/* Stepper with click-to-edit */}
+                  <div className="flex items-center bg-tg-bg border border-tg-hint/20 rounded-xl p-0.5 shrink-0 shadow-2xs">
+                    <button
+                      type="button"
+                      disabled={isProcessing}
+                      onClick={() => handleStepQuantity(item, -1)}
+                      className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-tg-secondary active:scale-90 text-tg-hint hover:text-tg-text font-bold text-base transition disabled:opacity-40"
+                      title="Уменьшить на 1"
+                    >
+                      −
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isProcessing}
+                      onClick={() => handlePromptQuantity(item)}
+                      className="px-1.5 py-0.5 font-bold text-xs text-tg-text hover:text-tg-button active:scale-95 transition min-w-[32px] text-center"
+                      title="Нажмите, чтобы ввести точное число"
+                    >
+                      {item.quantity} шт.
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isProcessing}
+                      onClick={() => handleStepQuantity(item, 1)}
+                      className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-tg-secondary active:scale-90 text-tg-button font-bold text-base transition disabled:opacity-40"
+                      title="Увеличить на 1"
+                    >
+                      +
+                    </button>
+                  </div>
                 </div>
 
                 {/* Bottom line: Expiration Badge and Action buttons */}

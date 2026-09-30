@@ -605,6 +605,49 @@ describe('Stage 4: Items & Expiration Dates API', () => {
       });
     });
 
+    describe('Direct Quantity Adjustment', () => {
+      it('updates quantity directly via POST /pantries/:id/items/:itemId/quantity', async () => {
+        const res = await makeAuthRequest(ownerUser, 'POST', `/pantries/pantry-1/items/${itemMultiQty.id}/quantity`, {
+          quantity: 10,
+        });
+        expect(res.status).toBe(200);
+        const data = await res.json();
+        expect(data.item.id).toBe(itemMultiQty.id);
+        expect(data.item.quantity).toBe(10);
+        expect(data.item.status).toBe('active');
+        expect(data.previousState.quantity).toBe(3);
+      });
+
+      it('updates quantity directly via PATCH /pantries/:id/items/:itemId', async () => {
+        const res = await makeAuthRequest(ownerUser, 'PATCH', `/pantries/pantry-1/items/${itemMultiQty.id}`, {
+          quantity: 5,
+        });
+        expect(res.status).toBe(200);
+        const data = await res.json();
+        expect(data.item.id).toBe(itemMultiQty.id);
+        expect(data.item.quantity).toBe(5);
+        expect(data.item.status).toBe('active');
+      });
+
+      it('closes item as consumed when setting quantity to 0', async () => {
+        const res = await makeAuthRequest(ownerUser, 'POST', `/pantries/pantry-1/items/${itemSingleQty.id}/quantity`, {
+          quantity: 0,
+        });
+        expect(res.status).toBe(200);
+        const data = await res.json();
+        expect(data.item.id).toBe(itemSingleQty.id);
+        expect(data.item.status).toBe('consumed');
+        expect(data.item.closed_at).toBe(fixedNow.toISOString());
+      });
+
+      it('returns 400 for negative quantities', async () => {
+        const res = await makeAuthRequest(ownerUser, 'POST', `/pantries/pantry-1/items/${itemMultiQty.id}/quantity`, {
+          quantity: -3,
+        });
+        expect(res.status).toBe(400);
+      });
+    });
+
     describe('FIFO Scan Consumption (POST /pantries/:id/items/consume-barcode)', () => {
       it('returns found: false when barcode does not exist in active inventory', async () => {
         const res = await makeAuthRequest(ownerUser, 'POST', '/pantries/pantry-1/items/consume-barcode', {

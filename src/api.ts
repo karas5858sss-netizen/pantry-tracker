@@ -403,6 +403,23 @@ export async function restoreItem(
 }
 
 /**
+ * Updates the quantity of an item directly without scanning.
+ */
+export async function updateItemQuantity(
+  pantryId: string,
+  itemId: string,
+  quantity: number
+): Promise<{ data?: { item: PantryItem; previousState: ItemPreviousState }; error?: ApiError }> {
+  return requestApi<{ item: PantryItem; previousState: ItemPreviousState }>(
+    `/pantries/${pantryId}/items/${itemId}/quantity`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ quantity }),
+    }
+  );
+}
+
+/**
  * Consumes an item by barcode using FIFO (First-In, First-Out).
  */
 export async function consumeBarcodeFifo(

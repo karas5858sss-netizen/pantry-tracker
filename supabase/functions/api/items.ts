@@ -263,6 +263,80 @@ export async function handleRestoreItem(
   );
 }
 
+export async function handleUpdateItemQuantity(
+  user: TelegramUser,
+  pantryId: string,
+  itemId: string,
+  req: Request,
+  deps: ApiDependencies
+): Promise<Response> {
+  const isAllowed = await deps.db.isUserAllowed(user.id);
+  if (!isAllowed) {
+    return new Response(
+      JSON.stringify({ error: 'Доступ запрещен', code: 'NOT_ALLOWED' }),
+      { status: 403, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+
+  const membership = await deps.db.getUserPantryMembership(pantryId, user.id);
+  if (!membership) {
+    return new Response(
+      JSON.stringify({ error: 'У вас нет доступа к этому складу', code: 'FORBIDDEN' }),
+      { status: 403, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+
+  const item = await deps.db.getItem(itemId);
+  if (!item || item.pantry_id !== pantryId) {
+    return new Response(
+      JSON.stringify({ error: 'Товар не найден на складе' }),
+      { status: 404, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+
+  const body = await req.json().catch(() => ({}));
+  const rawQuantity = body?.quantity;
+  const quantity = typeof rawQuantity === 'number' ? Math.floor(rawQuantity) : parseInt(String(rawQuantity), 10);
+
+  if (isNaN(quantity) || quantity < 0) {
+    return new Response(
+      JSON.stringify({ error: 'Количество должно быть неотрицательным целым числом' }),
+      { status: 400, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+
+  const previousState = {
+    id: item.id,
+    quantity: item.quantity,
+    status: item.status,
+    closed_at: item.closed_at,
+  };
+
+  const now = deps.now ? deps.now() : new Date();
+  let updated: ItemRecord;
+
+  if (quantity === 0) {
+    updated = await deps.db.updateItem(item.id, {
+      status: 'consumed',
+      closed_at: now.toISOString(),
+    });
+  } else {
+    updated = await deps.db.updateItem(item.id, {
+      quantity,
+      status: 'active',
+      closed_at: null,
+    });
+  }
+
+  return new Response(
+    JSON.stringify({
+      item: updated,
+      previousState,
+    }),
+    { status: 200, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+
 export async function handleConsumeBarcodeFifo(
   user: TelegramUser,
   pantryId: string,
