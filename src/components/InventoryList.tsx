@@ -311,13 +311,14 @@ export const InventoryList: React.FC<InventoryListProps> = ({
                     📅 {statusText}
                   </span>
 
-                  {/* Actions */}
+                  {/* Actions: Primary "Списать" + Compact "🗑️" icon */}
                   <div className="flex items-center gap-1.5 shrink-0">
                     <button
                       type="button"
                       disabled={isProcessing}
                       onClick={() => handleAction(item, 'consumed')}
-                      className="py-1 px-2.5 rounded-lg bg-tg-bg hover:bg-emerald-500/15 border border-tg-hint/20 hover:border-emerald-500/30 text-tg-text hover:text-emerald-500 text-[11px] font-semibold transition active:scale-95 disabled:opacity-50 flex items-center gap-1"
+                      className="py-1 px-3 rounded-xl bg-tg-button text-tg-button hover:opacity-90 text-[11px] font-bold transition active:scale-95 disabled:opacity-50 flex items-center gap-1 shadow-2xs"
+                      title={t(lang, 'item_action_consume')}
                     >
                       <span>🍽️</span>
                       <span>{t(lang, 'item_action_consume')}</span>
@@ -326,10 +327,11 @@ export const InventoryList: React.FC<InventoryListProps> = ({
                       type="button"
                       disabled={isProcessing}
                       onClick={() => handleAction(item, 'discarded')}
-                      className="py-1 px-2.5 rounded-lg bg-tg-bg hover:bg-red-500/15 border border-tg-hint/20 hover:border-red-500/30 text-tg-text hover:text-red-500 text-[11px] font-semibold transition active:scale-95 disabled:opacity-50 flex items-center gap-1"
+                      className="py-1 px-2 rounded-xl bg-tg-bg hover:bg-red-500/15 border border-tg-hint/20 hover:border-red-500/30 text-tg-hint hover:text-red-500 text-[12px] transition active:scale-95 disabled:opacity-50 flex items-center justify-center"
+                      title={t(lang, 'item_action_discard')}
+                      aria-label={t(lang, 'item_action_discard')}
                     >
                       <span>🗑️</span>
-                      <span>{t(lang, 'item_action_discard')}</span>
                     </button>
                   </div>
                 </div>

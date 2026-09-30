@@ -117,7 +117,7 @@ export const translations = {
     freshness_today: 'Истекает сегодня!',
     freshness_days_left: 'дн. осталось',
     freshness_fresh: 'Свежее',
-    item_action_consume: 'Использовано',
+    item_action_consume: 'Списать',
     item_action_discard: 'Выброшено',
     item_undo: 'Отменить',
     item_consumed_toast: 'Товар списан (использовано)',
