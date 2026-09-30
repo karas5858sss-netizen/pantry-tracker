@@ -6,6 +6,7 @@ import { PantryModal } from './components/PantryModal.tsx';
 import { ProductCardModal } from './components/ProductCardModal.tsx';
 import { InventoryList } from './components/InventoryList.tsx';
 import { FifoBatchPickerModal } from './components/FifoBatchPickerModal.tsx';
+import { UserSettingsModal } from './components/UserSettingsModal.tsx';
 import { initTelegramApp, triggerHaptic } from './telegram.ts';
 import {
   fetchSession,
@@ -54,6 +55,7 @@ export const App: React.FC = () => {
 
   // Modal state
   const [isPantryModalOpen, setIsPantryModalOpen] = useState(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
 
   // Language state
   const tgUser = typeof window !== 'undefined' ? window.Telegram?.WebApp?.initDataUnsafe?.user : undefined;
@@ -194,8 +196,19 @@ export const App: React.FC = () => {
           <p className="text-xs text-tg-hint">{t(lang, 'app_subtitle')}</p>
         </div>
         <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => {
+              setIsSettingsModalOpen(true);
+              triggerHaptic('light');
+            }}
+            className="w-8 h-8 rounded-full bg-tg-secondary border border-tg-hint/20 flex items-center justify-center text-sm hover:opacity-80 active:scale-95 transition"
+            title={t(lang, 'settings_title')}
+          >
+            ⚙️
+          </button>
           <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 font-semibold">
-            Stage 5
+            Stage 6
           </span>
         </div>
       </header>
@@ -540,6 +553,21 @@ export const App: React.FC = () => {
         onClose={() => setIsFifoModalOpen(false)}
         onSelectBatch={handleSelectFifoBatch}
       />
+
+      {/* Stage 6 User Settings Modal */}
+      {session?.user && (
+        <UserSettingsModal
+          isOpen={isSettingsModalOpen}
+          user={session.user}
+          lang={lang}
+          onClose={() => setIsSettingsModalOpen(false)}
+          onUserUpdated={(updatedUser) => {
+            setSession((prev) => (prev ? { ...prev, user: updatedUser } : null));
+            setToastMessage(`✓ ${t(lang, 'settings_saved')}`);
+            setTimeout(() => setToastMessage(null), 3000);
+          }}
+        />
+      )}
     </div>
   );
 };

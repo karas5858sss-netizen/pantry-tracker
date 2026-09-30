@@ -60,6 +60,9 @@ function createMockDb(): DatabaseClient & {
     async deletePantry() {},
     async removePantryMember() {},
     async updateCanWritePm() {},
+    async updateUserSettings(_userId: number, _settings: any): Promise<any> {
+      throw new Error('Not used in product tests');
+    },
 
     // Stage 3 methods
     async getProduct(barcode: string) {

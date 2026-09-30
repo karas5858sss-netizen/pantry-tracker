@@ -158,6 +158,10 @@ function createMockDb(): DatabaseClient & {
       if (user) user.can_write_pm = canWrite;
     },
 
+    async updateUserSettings(_userId: number, _settings: any): Promise<UserRecord> {
+      throw new Error('Not implemented in items tests');
+    },
+
     async getProduct(barcode: string): Promise<ProductRecord | null> {
       return productsMap.get(barcode) || null;
     },

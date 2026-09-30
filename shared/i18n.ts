@@ -131,6 +131,22 @@ export const translations = {
     inventory_clear_confirm: 'Вы уверены, что хотите удалить все товары со склада?',
     item_action_discard_all: 'Удалить позицию целиком',
 
+    // Stage 6: Reminders & User Settings
+    reminder_title: 'Склад «{name}»: напоминание о сроках',
+    reminder_expired_section: '🔴 Просрочено',
+    reminder_today_section: '⚠️ Истекает сегодня',
+    reminder_soon_section: '⏳ Скоро истекает (1–2 дня)',
+    reminder_more_items: '... и ещё {count} позиций',
+    reminder_unit_pcs: 'шт.',
+    settings_title: 'Настройки напоминаний',
+    settings_reminders_enabled: 'Уведомления в Telegram',
+    settings_reminder_hour: 'Время напоминания',
+    settings_timezone: 'Часовой пояс',
+    settings_save: 'Сохранить настройки',
+    settings_saved: 'Настройки сохранены!',
+    settings_bot_blocked_warn: 'Для получения напоминаний напишите боту в личные сообщения /start',
+    settings_open_bot: 'Открыть диалог с ботом',
+
     // Common
     btn_retry: 'Повторить',
     btn_copy: 'Копировать',
@@ -263,6 +279,22 @@ export const translations = {
     inventory_clear_confirm: '¿Seguro que deseas eliminar todos los productos?',
     item_action_discard_all: 'Eliminar lote completo',
 
+    // Stage 6: Reminders & User Settings
+    reminder_title: 'Despensa «{name}»: recordatorio de caducidad',
+    reminder_expired_section: '🔴 Caducado',
+    reminder_today_section: '⚠️ Caduca hoy',
+    reminder_soon_section: '⏳ Caduca pronto (1–2 días)',
+    reminder_more_items: '... y {count} productos más',
+    reminder_unit_pcs: 'ud.',
+    settings_title: 'Ajustes de recordatorios',
+    settings_reminders_enabled: 'Notificaciones en Telegram',
+    settings_reminder_hour: 'Hora de notificación',
+    settings_timezone: 'Zona horaria',
+    settings_save: 'Guardar ajustes',
+    settings_saved: '¡Ajustes guardados!',
+    settings_bot_blocked_warn: 'Para recibir avisos, envía /start al bot por mensaje privado',
+    settings_open_bot: 'Abrir chat con el bot',
+
     // Common
     btn_retry: 'Reintentar',
     btn_copy: 'Copiar',
@@ -394,6 +426,22 @@ export const translations = {
     inventory_clear_all: 'Clear all',
     inventory_clear_confirm: 'Are you sure you want to clear all items from pantry?',
     item_action_discard_all: 'Delete entire position',
+
+    // Stage 6: Reminders & User Settings
+    reminder_title: 'Pantry "{name}": expiration reminder',
+    reminder_expired_section: '🔴 Expired',
+    reminder_today_section: '⚠️ Expires today',
+    reminder_soon_section: '⏳ Expiring soon (1–2 days)',
+    reminder_more_items: '... and {count} more items',
+    reminder_unit_pcs: 'pcs.',
+    settings_title: 'Reminder Settings',
+    settings_reminders_enabled: 'Telegram Notifications',
+    settings_reminder_hour: 'Reminder time',
+    settings_timezone: 'Timezone',
+    settings_save: 'Save settings',
+    settings_saved: 'Settings saved!',
+    settings_bot_blocked_warn: 'To receive notifications, message /start to the bot in direct chat',
+    settings_open_bot: 'Open chat with bot',
 
     // Common
     btn_retry: 'Retry',

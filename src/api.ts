@@ -453,4 +453,23 @@ export async function clearPantryItems(
   });
 }
 
+export interface UpdateUserSettingsPayload {
+  reminder_hour?: number;
+  reminders_enabled?: boolean;
+  timezone?: string;
+}
+
+/**
+ * Updates user reminder settings (hour, enabled/disabled, timezone).
+ */
+export async function updateUserSettings(
+  payload: UpdateUserSettingsPayload
+): Promise<{ data?: { user: SessionUser }; error?: ApiError }> {
+  return requestApi<{ user: SessionUser }>('/user/settings', {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+}
+
+
 

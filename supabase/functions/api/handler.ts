@@ -1,6 +1,6 @@
 import type { ApiDependencies } from './types.ts';
 import { validateTelegramInitData } from '../../../shared/telegramAuth.ts';
-import { handleSession } from './session.ts';
+import { handleSession, handleUpdateUserSettings } from './session.ts';
 import {
   handleCreatePantry,
   handleCreateInvite,
@@ -96,6 +96,12 @@ export async function handleApiRequest(req: Request, deps: ApiDependencies): Pro
   // Route: POST /user/write-access
   if (pathname === '/user/write-access' && req.method === 'POST') {
     const res = await handleUpdateWriteAccess(user, req, deps);
+    return addCors(res);
+  }
+
+  // Route: POST/PATCH /user/settings (update reminder hour, enable/disable, timezone)
+  if (pathname === '/user/settings' && (req.method === 'PATCH' || req.method === 'POST')) {
+    const res = await handleUpdateUserSettings(user, req, deps);
     return addCors(res);
   }
 

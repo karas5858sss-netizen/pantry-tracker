@@ -18,6 +18,7 @@ import type {
   ItemRecord,
   CreateItemData,
   UpdateItemData,
+  UpdateUserSettingsData,
 } from './types.ts';
 import {
   getOffApiUrl,
@@ -315,6 +316,31 @@ const db: DatabaseClient = {
     if (error) {
       console.warn('Failed to update can_write_pm:', error);
     }
+  },
+
+  async updateUserSettings(userId: number, settings: UpdateUserSettingsData): Promise<UserRecord> {
+    const updates: Record<string, any> = {};
+    if (typeof settings.reminder_hour === 'number' && settings.reminder_hour >= 0 && settings.reminder_hour <= 23) {
+      updates.reminder_hour = settings.reminder_hour;
+    }
+    if (typeof settings.reminders_enabled === 'boolean') {
+      updates.reminders_enabled = settings.reminders_enabled;
+    }
+    if (typeof settings.timezone === 'string' && settings.timezone.trim()) {
+      updates.timezone = settings.timezone.trim();
+    }
+
+    const { data, error } = await supabase
+      .from('users')
+      .update(updates)
+      .eq('telegram_id', userId)
+      .select()
+      .single();
+
+    if (error || !data) {
+      throw new Error(`Failed to update user settings: ${error?.message}`);
+    }
+    return data as UserRecord;
   },
 
   async getProduct(barcode: string): Promise<ProductRecord | null> {

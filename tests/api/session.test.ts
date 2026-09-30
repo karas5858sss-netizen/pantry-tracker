@@ -111,7 +111,28 @@ function createMockDb(): DatabaseClient & {
     async leavePantry(_pantryId: string, _userId: number) {},
     async deletePantry(_pantryId: string, _ownerId: number) {},
     async removePantryMember(_pantryId: string, _ownerId: number, _targetUserId: number) {},
-    async updateCanWritePm(_userId: number, _canWrite: boolean) {},
+    async updateCanWritePm(userId: number, canWrite: boolean) {
+      const user = usersMap.get(userId);
+      if (user) {
+        user.can_write_pm = canWrite;
+      }
+    },
+    async updateUserSettings(userId: number, settings: import('../../supabase/functions/api/types.ts').UpdateUserSettingsData) {
+      const user = usersMap.get(userId);
+      if (!user) {
+        throw new Error('User not found');
+      }
+      if (typeof settings.reminder_hour === 'number') {
+        user.reminder_hour = settings.reminder_hour;
+      }
+      if (typeof settings.reminders_enabled === 'boolean') {
+        user.reminders_enabled = settings.reminders_enabled;
+      }
+      if (typeof settings.timezone === 'string') {
+        user.timezone = settings.timezone;
+      }
+      return user;
+    },
     async getProduct(_barcode: string) {
       return null;
     },
@@ -326,5 +347,62 @@ describe('API POST /session Pure Handler', () => {
 
     const resExisting = await handleApiRequest(reqExisting, deps);
     expect(resExisting.status).toBe(200);
+  });
+
+  it('updates user reminder settings via PATCH /user/settings', async () => {
+    mockDb.allowedUsersSet.add(12345);
+    const testNow = new Date('2026-10-01T10:00:00Z');
+    deps.now = () => testNow;
+    const user: TelegramUser = { id: 12345, first_name: 'Settings Tester' };
+
+    // Initial session to create user
+    const initData = await createTestInitData(user, TEST_BOT_TOKEN, {
+      authDateSeconds: Math.floor(testNow.getTime() / 1000) - 10,
+    });
+    await handleApiRequest(
+      new Request('https://example.com/api/session', {
+        method: 'POST',
+        headers: { Authorization: `tma ${initData}` },
+      }),
+      deps
+    );
+
+    // Update settings: reminder_hour = 14, reminders_enabled = false, timezone = 'America/New_York'
+    const patchReq = new Request('https://example.com/api/user/settings', {
+      method: 'PATCH',
+      headers: {
+        Authorization: `tma ${initData}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        reminder_hour: 14,
+        reminders_enabled: false,
+        timezone: 'America/New_York',
+      }),
+    });
+
+    const patchRes = await handleApiRequest(patchReq, deps);
+    expect(patchRes.status).toBe(200);
+    const patchData = await patchRes.json();
+    expect(patchData.user.reminder_hour).toBe(14);
+    expect(patchData.user.reminders_enabled).toBe(false);
+    expect(patchData.user.timezone).toBe('America/New_York');
+
+    // Verify invalid hour rejects with 400
+    const invalidReq = new Request('https://example.com/api/user/settings', {
+      method: 'PATCH',
+      headers: {
+        Authorization: `tma ${initData}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        reminder_hour: 25,
+      }),
+    });
+
+    const invalidRes = await handleApiRequest(invalidReq, deps);
+    expect(invalidRes.status).toBe(400);
+    const invalidBody = await invalidRes.json();
+    expect(invalidBody.code).toBe('INVALID_REMINDER_HOUR');
   });
 });

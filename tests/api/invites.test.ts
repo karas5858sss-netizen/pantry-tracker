@@ -213,6 +213,10 @@ function createMockDb(): DatabaseClient & {
       }
     },
 
+    async updateUserSettings(_userId: number, _settings: any): Promise<UserRecord> {
+      throw new Error('Not implemented in invites tests');
+    },
+
     async getProduct(_barcode: string) {
       return null;
     },

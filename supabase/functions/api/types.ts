@@ -23,6 +23,12 @@ export interface UpsertUserData {
   timezone?: string;
 }
 
+export interface UpdateUserSettingsData {
+  reminder_hour?: number;
+  reminders_enabled?: boolean;
+  timezone?: string;
+}
+
 export interface PantryRecord {
   id: string;
   name: string;
@@ -75,6 +81,7 @@ export interface DatabaseClient {
   deletePantry: (pantryId: string, ownerId: number) => Promise<void>;
   removePantryMember: (pantryId: string, ownerId: number, targetUserId: number) => Promise<void>;
   updateCanWritePm: (userId: number, canWrite: boolean) => Promise<void>;
+  updateUserSettings: (userId: number, settings: UpdateUserSettingsData) => Promise<UserRecord>;
 
   // Stage 3: Products resolution and catalog
   getProduct: (barcode: string) => Promise<ProductRecord | null>;

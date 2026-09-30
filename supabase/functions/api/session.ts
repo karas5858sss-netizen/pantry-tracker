@@ -83,3 +83,58 @@ export async function handleSession(
     headers: { 'Content-Type': 'application/json' },
   });
 }
+
+export async function handleUpdateUserSettings(
+  user: TelegramUser,
+  req: Request,
+  deps: ApiDependencies
+): Promise<Response> {
+  try {
+    const body = await req.json();
+    const updates: import('./types.ts').UpdateUserSettingsData = {};
+
+    if (body?.reminder_hour !== undefined) {
+      const hour = Number(body.reminder_hour);
+      if (isNaN(hour) || hour < 0 || hour > 23 || !Number.isInteger(hour)) {
+        return new Response(
+          JSON.stringify({
+            error: 'Параметр reminder_hour должен быть целым числом от 0 до 23',
+            code: 'INVALID_REMINDER_HOUR',
+          }),
+          {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' },
+          }
+        );
+      }
+      updates.reminder_hour = hour;
+    }
+
+    if (body?.reminders_enabled !== undefined) {
+      updates.reminders_enabled = Boolean(body.reminders_enabled);
+    }
+
+    if (body?.timezone !== undefined && typeof body.timezone === 'string' && body.timezone.trim()) {
+      updates.timezone = body.timezone.trim();
+    }
+
+    const updatedUser = await deps.db.updateUserSettings(user.id, updates);
+
+    return new Response(JSON.stringify({ user: updatedUser }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  } catch (err: any) {
+    return new Response(
+      JSON.stringify({
+        error: err.message || 'Ошибка обновления настроек',
+        code: 'UPDATE_SETTINGS_FAILED',
+      }),
+      {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
+  }
+}
+
