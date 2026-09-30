@@ -11,6 +11,7 @@ import type {
   UpsertUserData,
   CreateItemData,
   ItemRecord,
+  UpdateItemData,
 } from '../../supabase/functions/api/types.ts';
 
 const TEST_BOT_TOKEN = '123456789:ABCDEF_mock_bot_token_for_tests';
@@ -222,6 +223,15 @@ function createMockDb(): DatabaseClient & {
       throw new Error('Not implemented in invite tests');
     },
     async getPantryItems(_pantryId: string, _status?: 'active' | 'consumed' | 'discarded'): Promise<ItemRecord[]> {
+      return [];
+    },
+    async getItem(_itemId: string): Promise<ItemRecord | null> {
+      return null;
+    },
+    async updateItem(_itemId: string, _updates: UpdateItemData): Promise<ItemRecord> {
+      throw new Error('Not implemented in invite tests');
+    },
+    async getActiveItemsByBarcode(_pantryId: string, _barcode: string): Promise<ItemRecord[]> {
       return [];
     },
   };

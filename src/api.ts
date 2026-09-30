@@ -346,3 +346,81 @@ export async function getPantryItems(
   });
 }
 
+export interface ItemPreviousState {
+  id: string;
+  quantity: number;
+  status: 'active' | 'consumed' | 'discarded';
+  closed_at: string | null;
+}
+
+export interface ConsumeItemResponse {
+  item: PantryItem;
+  previousState: ItemPreviousState;
+  action: 'consumed' | 'discarded';
+}
+
+export interface ConsumeFifoResponse {
+  found: boolean;
+  multipleBatches?: boolean;
+  items?: PantryItem[];
+  item?: PantryItem;
+  previousState?: ItemPreviousState;
+  action?: 'consumed' | 'discarded';
+}
+
+/**
+ * Consumes an item (decrements quantity or sets status = 'consumed').
+ */
+export async function consumeItem(
+  pantryId: string,
+  itemId: string,
+  action: 'consumed' | 'discarded' = 'consumed',
+  all: boolean = false
+): Promise<{ data?: ConsumeItemResponse; error?: ApiError }> {
+  return requestApi<ConsumeItemResponse>(`/pantries/${pantryId}/items/${itemId}/${action}`, {
+    method: 'POST',
+    body: JSON.stringify({ all }),
+  });
+}
+
+/**
+ * Restores an item to its previous state (Undo operation).
+ */
+export async function restoreItem(
+  pantryId: string,
+  itemId: string,
+  previousState: ItemPreviousState
+): Promise<{ data?: { item: PantryItem }; error?: ApiError }> {
+  return requestApi<{ item: PantryItem }>(`/pantries/${pantryId}/items/${itemId}/restore`, {
+    method: 'POST',
+    body: JSON.stringify({
+      quantity: previousState.quantity,
+      status: previousState.status,
+      closed_at: previousState.closed_at,
+    }),
+  });
+}
+
+/**
+ * Consumes an item by barcode using FIFO (First-In, First-Out).
+ */
+export async function consumeBarcodeFifo(
+  pantryId: string,
+  barcode: string,
+  options?: {
+    itemId?: string;
+    action?: 'consumed' | 'discarded';
+    force?: boolean;
+  }
+): Promise<{ data?: ConsumeFifoResponse; error?: ApiError }> {
+  return requestApi<ConsumeFifoResponse>(`/pantries/${pantryId}/items/consume-barcode`, {
+    method: 'POST',
+    body: JSON.stringify({
+      barcode,
+      itemId: options?.itemId,
+      action: options?.action,
+      force: options?.force,
+    }),
+  });
+}
+

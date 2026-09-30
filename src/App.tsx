@@ -4,30 +4,45 @@ import { PhotoScanner } from './components/PhotoScanner.tsx';
 import { ManualBarcodeInput } from './components/ManualBarcodeInput.tsx';
 import { PantryModal } from './components/PantryModal.tsx';
 import { ProductCardModal } from './components/ProductCardModal.tsx';
+import { InventoryList } from './components/InventoryList.tsx';
+import { FifoBatchPickerModal } from './components/FifoBatchPickerModal.tsx';
 import { initTelegramApp, triggerHaptic } from './telegram.ts';
 import {
   fetchSession,
   joinPantry,
   updateWriteAccess,
+  consumeBarcodeFifo,
   type SessionData,
   type ApiError,
   type Pantry,
+  type PantryItem,
 } from './api.ts';
 import { detectLanguage, t, type SupportedLanguage } from '@shared/i18n.ts';
 import { parseStartParam } from '@shared/invites.ts';
 import type { BarcodeDetection } from './barcodeReader.ts';
 
+type ActiveSection = 'inventory' | 'scanner';
 type ScanMode = 'live' | 'photo' | 'manual';
+type ScannerAction = 'add' | 'consume';
 
 export const App: React.FC = () => {
-  const [mode, setMode] = useState<ScanMode>('live');
+  const [activeSection, setActiveSection] = useState<ActiveSection>('inventory');
+  const [scannerMode, setScannerMode] = useState<ScannerAction>('add');
+  const [scanType, setScanType] = useState<ScanMode>('live');
+
   const [currentResult, setCurrentResult] = useState<BarcodeDetection | null>(null);
   const [history, setHistory] = useState<BarcodeDetection[]>([]);
   const [copied, setCopied] = useState(false);
 
-  // Stage 3 Product modal state
+  // Stage 3 & 4 Product card modal state
   const [selectedProductBarcode, setSelectedProductBarcode] = useState<string | null>(null);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+
+  // Stage 5 FIFO batch picker modal state
+  const [fifoBatches, setFifoBatches] = useState<PantryItem[]>([]);
+  const [fifoBarcode, setFifoBarcode] = useState<string>('');
+  const [isFifoModalOpen, setIsFifoModalOpen] = useState(false);
+  const [inventoryRefreshKey, setInventoryRefreshKey] = useState(0);
 
   // Session state
   const [session, setSession] = useState<SessionData | null>(null);
@@ -60,12 +75,12 @@ export const App: React.FC = () => {
         setLang(detectLanguage(result.data.user.language_code));
       }
 
-      // 1. Request write access for notifications if not granted yet
-      if (!result.data.user.can_write_pm && typeof window !== 'undefined' && window.Telegram?.WebApp) {
+      // 1. Request Telegram PM write access if not granted
+      const tgWebApp = typeof window !== 'undefined' ? (window.Telegram?.WebApp as unknown as { requestWriteAccess?: (cb: (allowed: boolean) => void) => void }) : undefined;
+      if (!result.data.user.can_write_pm && tgWebApp?.requestWriteAccess) {
         try {
-          // @ts-expect-error Telegram WebApp method
-          window.Telegram.WebApp.requestWriteAccess?.((granted: boolean) => {
-            if (granted) {
+          tgWebApp.requestWriteAccess((allowed: boolean) => {
+            if (allowed) {
               updateWriteAccess(true);
             }
           });
@@ -100,11 +115,58 @@ export const App: React.FC = () => {
     loadSession();
   }, [loadSession]);
 
-  const handleDetected = (detection: BarcodeDetection) => {
+  const handleDetected = async (detection: BarcodeDetection) => {
     setCurrentResult(detection);
     setHistory((prev) => [detection, ...prev.filter((d) => d.text !== detection.text)].slice(0, 8));
-    setSelectedProductBarcode(detection.text);
-    setIsProductModalOpen(true);
+
+    if (scannerMode === 'add') {
+      setSelectedProductBarcode(detection.text);
+      setIsProductModalOpen(true);
+    } else {
+      // Consume mode: check FIFO
+      if (!currentPantry) {
+        setToastMessage(t(lang, 'item_no_pantry'));
+        triggerHaptic('error');
+        setTimeout(() => setToastMessage(null), 3000);
+        return;
+      }
+
+      const res = await consumeBarcodeFifo(currentPantry.id, detection.text);
+      if (!res.data?.found) {
+        setToastMessage(t(lang, 'fifo_not_found'));
+        triggerHaptic('error');
+        setTimeout(() => setToastMessage(null), 3500);
+        return;
+      }
+
+      if (res.data.multipleBatches && res.data.items && res.data.items.length > 0) {
+        setFifoBatches(res.data.items);
+        setFifoBarcode(detection.text);
+        setIsFifoModalOpen(true);
+        triggerHaptic('heavy');
+      } else if (res.data.item) {
+        triggerHaptic('success');
+        setToastMessage(`✓ «${res.data.item.name}» списан (-1 шт.)!`);
+        setTimeout(() => setToastMessage(null), 3500);
+        setInventoryRefreshKey((k) => k + 1);
+      }
+    }
+  };
+
+  const handleSelectFifoBatch = async (batch: PantryItem) => {
+    if (!currentPantry) return;
+    setIsFifoModalOpen(false);
+
+    const res = await consumeBarcodeFifo(currentPantry.id, fifoBarcode, {
+      itemId: batch.id,
+    });
+
+    if (res.data?.item) {
+      triggerHaptic('success');
+      setToastMessage(`✓ «${res.data.item.name}» списан (-1 шт.)!`);
+      setTimeout(() => setToastMessage(null), 3500);
+      setInventoryRefreshKey((k) => k + 1);
+    }
   };
 
   const copyToClipboard = (text: string) => {
@@ -118,7 +180,7 @@ export const App: React.FC = () => {
     <div className="min-h-screen bg-tg-bg text-tg-text flex flex-col items-center px-4 py-3 sm:py-6 max-w-md mx-auto">
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed top-3 left-4 right-4 z-50 p-3 bg-emerald-500 text-white rounded-xl shadow-lg text-xs font-semibold text-center animate-bounce-short">
+        <div className="fixed top-3 left-4 right-4 z-50 p-3 bg-emerald-500 text-white rounded-2xl shadow-lg text-xs font-semibold text-center animate-bounce-short">
           {toastMessage}
         </div>
       )}
@@ -133,7 +195,7 @@ export const App: React.FC = () => {
         </div>
         <div className="flex items-center gap-1.5">
           <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 font-semibold">
-            Stage 4
+            Stage 5
           </span>
         </div>
       </header>
@@ -147,10 +209,10 @@ export const App: React.FC = () => {
               setIsPantryModalOpen(true);
               triggerHaptic('light');
             }}
-            className="flex items-center gap-2 font-semibold text-tg-text hover:opacity-80 transition"
+            className="flex items-center gap-2 font-semibold text-tg-text hover:opacity-80 transition text-left"
           >
             <span className="text-base">{currentPantry.role === 'owner' ? '👑' : '👥'}</span>
-            <div className="text-left">
+            <div>
               <div className="flex items-center gap-1">
                 <span>{currentPantry.name}</span>
                 <span className="text-[10px] text-tg-hint">▼</span>
@@ -207,191 +269,223 @@ export const App: React.FC = () => {
         </div>
       )}
 
-      {/* Mode Switcher Tabs */}
-      <nav className="w-full grid grid-cols-3 gap-1 bg-tg-secondary p-1 rounded-xl mb-4 border border-tg-hint/15">
+      {/* Stage 5: Primary Navigation Tabs (📦 Склад vs 📷 Сканер) */}
+      <nav className="w-full grid grid-cols-2 gap-1.5 p-1 bg-tg-secondary rounded-2xl mb-3 border border-tg-hint/15">
         <button
           type="button"
           onClick={() => {
-            setMode('live');
+            setActiveSection('inventory');
             triggerHaptic('light');
           }}
-          className={`py-2 text-xs font-semibold rounded-lg transition flex items-center justify-center gap-1.5 ${
-            mode === 'live'
-              ? 'bg-tg-bg text-tg-text shadow-sm'
+          className={`py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 ${
+            activeSection === 'inventory'
+              ? 'bg-tg-button text-tg-button shadow-sm'
               : 'text-tg-hint hover:text-tg-text'
           }`}
         >
-          <span>📹</span>
-          <span>{t(lang, 'mode_live')}</span>
+          <span>📦</span>
+          <span>{t(lang, 'tab_inventory')}</span>
         </button>
 
         <button
           type="button"
           onClick={() => {
-            setMode('photo');
+            setActiveSection('scanner');
             triggerHaptic('light');
           }}
-          className={`py-2 text-xs font-semibold rounded-lg transition flex items-center justify-center gap-1.5 ${
-            mode === 'photo'
-              ? 'bg-tg-bg text-tg-text shadow-sm'
+          className={`py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 ${
+            activeSection === 'scanner'
+              ? 'bg-tg-button text-tg-button shadow-sm'
               : 'text-tg-hint hover:text-tg-text'
           }`}
         >
           <span>📷</span>
-          <span>{t(lang, 'mode_photo')}</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            setMode('manual');
-            triggerHaptic('light');
-          }}
-          className={`py-2 text-xs font-semibold rounded-lg transition flex items-center justify-center gap-1.5 ${
-            mode === 'manual'
-              ? 'bg-tg-bg text-tg-text shadow-sm'
-              : 'text-tg-hint hover:text-tg-text'
-          }`}
-        >
-          <span>⌨️</span>
-          <span>{t(lang, 'mode_manual')}</span>
+          <span>{t(lang, 'tab_scan')}</span>
         </button>
       </nav>
 
-      {/* Main Mode View */}
-      <main className="w-full flex flex-col items-center">
-        {mode === 'live' && (
-          <LiveScanner
-            onDetected={handleDetected}
-            onSwitchToPhoto={() => setMode('photo')}
-          />
-        )}
-
-        {mode === 'photo' && (
-          <PhotoScanner
-            onDetected={handleDetected}
-            onSwitchToManual={() => setMode('manual')}
-          />
-        )}
-
-        {mode === 'manual' && (
-          <ManualBarcodeInput onDetected={handleDetected} />
-        )}
-      </main>
-
-      {/* Current Scanned Result Card */}
-      {currentResult && (
-        <section className="w-full mt-4 bg-tg-secondary border border-tg-hint/25 rounded-2xl p-4 shadow-sm animate-fade-in">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-tg-hint">
-              {t(lang, 'scanner_scanned')}
-            </span>
-            <div className="flex items-center gap-1.5">
-              <span className="text-[11px] px-2 py-0.5 rounded-md bg-tg-button/15 text-tg-link font-semibold">
-                {currentResult.format}
-              </span>
-              <span
-                className={`text-[11px] px-2 py-0.5 rounded-md font-semibold ${
-                  currentResult.isValidEan
-                    ? 'bg-emerald-500/15 text-emerald-500'
-                    : 'bg-red-500/15 text-red-500'
-                }`}
-              >
-                {currentResult.isValidEan ? 'EAN OK' : 'Не EAN'}
-              </span>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between gap-2 mt-1">
-            <span className="font-mono text-xl sm:text-2xl font-bold tracking-widest text-tg-text select-all">
-              {currentResult.text}
-            </span>
-
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedProductBarcode(currentResult.text);
-                  setIsProductModalOpen(true);
-                }}
-                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold transition active:scale-95 flex items-center gap-1"
-              >
-                <span>🔍</span>
-                <span>Определить</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => copyToClipboard(currentResult.text)}
-                className="px-3 py-1.5 bg-tg-bg border border-tg-hint/20 hover:border-tg-hint/40 rounded-xl text-xs font-medium text-tg-text transition active:scale-95"
-              >
-                {copied ? ` ${t(lang, 'copied')}` : `📋 ${t(lang, 'btn_copy')}`}
-              </button>
-            </div>
-          </div>
-
-          {currentResult.isValidEan ? (
-            <p className="text-[12px] text-emerald-500 mt-2 flex items-center gap-1 font-medium">
-              <span>✅</span>
-              <span>{t(lang, 'ean_valid')}</span>
-            </p>
-          ) : (
-            <p className="text-[12px] text-amber-500 mt-2 flex items-center gap-1">
-              <span>⚠️</span>
-              <span>{t(lang, 'ean_invalid')}</span>
-            </p>
-          )}
-        </section>
+      {/* SECTION 1: INVENTORY LIST VIEW */}
+      {activeSection === 'inventory' && currentPantry && (
+        <InventoryList
+          key={`${currentPantry.id}-${inventoryRefreshKey}`}
+          pantryId={currentPantry.id}
+          pantryName={currentPantry.name}
+          lang={lang}
+          onOpenScanner={() => setActiveSection('scanner')}
+        />
       )}
 
-      {/* History */}
-      {history.length > 0 && (
-        <section className="w-full mt-4">
-          <div className="flex items-center justify-between mb-2 px-1">
-            <span className="text-xs font-semibold text-tg-hint uppercase tracking-wider">
-              {t(lang, 'history_title')} ({history.length})
-            </span>
-            <button
-              type="button"
-              onClick={() => setHistory([])}
-              className="text-[11px] text-tg-hint hover:text-tg-destructive transition"
-            >
-              {t(lang, 'history_clear')}
-            </button>
+      {/* SECTION 2: SCANNER VIEW */}
+      {activeSection === 'scanner' && (
+        <div className="w-full space-y-3">
+          {/* Scanner Mode Toggle: [+ Приход] vs [− Списание] */}
+          <div className="w-full flex items-center justify-between p-1.5 bg-tg-secondary rounded-2xl border border-tg-hint/15">
+            <span className="text-[11px] font-semibold text-tg-hint pl-2">Действие:</span>
+            <div className="flex gap-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setScannerMode('add');
+                  triggerHaptic('light');
+                }}
+                className={`py-1.5 px-3 rounded-xl text-xs font-bold transition flex items-center gap-1 ${
+                  scannerMode === 'add'
+                    ? 'bg-emerald-500 text-white shadow-xs'
+                    : 'text-tg-hint hover:text-tg-text'
+                }`}
+              >
+                <span>➕</span>
+                <span>{t(lang, 'scan_mode_add')}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setScannerMode('consume');
+                  triggerHaptic('light');
+                }}
+                className={`py-1.5 px-3 rounded-xl text-xs font-bold transition flex items-center gap-1 ${
+                  scannerMode === 'consume'
+                    ? 'bg-amber-500 text-black shadow-xs'
+                    : 'text-tg-hint hover:text-tg-text'
+                }`}
+              >
+                <span>➖</span>
+                <span>{t(lang, 'scan_mode_consume')}</span>
+              </button>
+            </div>
           </div>
 
-          <div className="flex flex-col gap-1.5">
-            {history.map((item) => (
-              <div
-                key={`${item.text}-${item.timestamp}`}
-                onClick={() => {
-                  setCurrentResult(item);
-                  setSelectedProductBarcode(item.text);
-                  setIsProductModalOpen(true);
-                }}
-                className="flex items-center justify-between p-2.5 bg-tg-secondary/70 hover:bg-tg-secondary border border-tg-hint/15 rounded-xl cursor-pointer transition text-xs"
-              >
-                <div className="flex items-center gap-2">
-                  <span className="font-mono font-bold text-sm tracking-wider text-tg-text">
-                    {item.text}
-                  </span>
-                  <span className="text-[10px] text-tg-hint font-medium">
-                    ({item.format})
-                  </span>
-                </div>
-                <span
-                  className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
-                    item.isValidEan
-                      ? 'text-emerald-500 bg-emerald-500/10'
-                      : 'text-amber-500 bg-amber-500/10'
-                  }`}
-                >
-                  {item.isValidEan ? '✓ EAN' : '!'}
+          {/* Scanner Input Sub-mode: Live / Photo / Manual */}
+          <nav className="w-full grid grid-cols-3 gap-1 bg-tg-secondary p-1 rounded-xl border border-tg-hint/15">
+            <button
+              type="button"
+              onClick={() => {
+                setScanType('live');
+                triggerHaptic('light');
+              }}
+              className={`py-1.5 text-xs font-semibold rounded-lg transition flex items-center justify-center gap-1.5 ${
+                scanType === 'live'
+                  ? 'bg-tg-bg text-tg-text shadow-xs'
+                  : 'text-tg-hint hover:text-tg-text'
+              }`}
+            >
+              <span>📹</span>
+              <span>{t(lang, 'mode_live')}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setScanType('photo');
+                triggerHaptic('light');
+              }}
+              className={`py-1.5 text-xs font-semibold rounded-lg transition flex items-center justify-center gap-1.5 ${
+                scanType === 'photo'
+                  ? 'bg-tg-bg text-tg-text shadow-xs'
+                  : 'text-tg-hint hover:text-tg-text'
+              }`}
+            >
+              <span>📷</span>
+              <span>{t(lang, 'mode_photo')}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setScanType('manual');
+                triggerHaptic('light');
+              }}
+              className={`py-1.5 text-xs font-semibold rounded-lg transition flex items-center justify-center gap-1.5 ${
+                scanType === 'manual'
+                  ? 'bg-tg-bg text-tg-text shadow-xs'
+                  : 'text-tg-hint hover:text-tg-text'
+              }`}
+            >
+              <span>⌨️</span>
+              <span>{t(lang, 'mode_manual')}</span>
+            </button>
+          </nav>
+
+          {/* Scanner active mode container */}
+          <main className="w-full">
+            {scanType === 'live' && (
+              <LiveScanner
+                onDetected={handleDetected}
+                onSwitchToPhoto={() => setScanType('photo')}
+              />
+            )}
+            {scanType === 'photo' && (
+              <PhotoScanner
+                onDetected={handleDetected}
+                onSwitchToManual={() => setScanType('manual')}
+              />
+            )}
+            {scanType === 'manual' && (
+              <ManualBarcodeInput onDetected={handleDetected} />
+            )}
+          </main>
+
+          {/* Current result badge */}
+          {currentResult && (
+            <div className="w-full p-3.5 rounded-2xl bg-tg-secondary border border-tg-hint/20 text-xs space-y-1.5 animate-slide-up">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-tg-text flex items-center gap-1.5">
+                  <span>{currentResult.isValidEan ? '✅' : 'ℹ️'}</span>
+                  <span>{currentResult.isValidEan ? 'EAN OK' : 'Штрихкод'}</span>
                 </span>
+                <span className="font-mono text-xs font-bold text-tg-button">{currentResult.text}</span>
               </div>
-            ))}
-          </div>
-        </section>
+              <p className="text-[11px] text-tg-hint">
+                {currentResult.isValidEan
+                  ? t(lang, 'ean_valid')
+                  : t(lang, 'ean_invalid')}
+              </p>
+            </div>
+          )}
+
+          {/* History */}
+          {history.length > 0 && (
+            <section className="w-full pt-1 space-y-1.5">
+              <div className="flex items-center justify-between text-xs text-tg-hint">
+                <span className="font-semibold">{t(lang, 'history_title')}</span>
+                <button
+                  type="button"
+                  onClick={() => setHistory([])}
+                  className="hover:underline"
+                >
+                  {t(lang, 'history_clear')}
+                </button>
+              </div>
+
+              <div className="space-y-1 max-h-40 overflow-y-auto">
+                {history.map((item, index) => (
+                  <div
+                    key={`${item.text}-${index}`}
+                    onClick={() => copyToClipboard(item.text)}
+                    className="p-2 rounded-xl bg-tg-secondary/70 border border-tg-hint/15 flex items-center justify-between text-xs cursor-pointer hover:bg-tg-secondary transition active:scale-98"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-tg-text font-medium">{item.text}</span>
+                      <span className="text-[10px] text-tg-hint">
+                        {copied ? t(lang, 'copied') : item.format || 'EAN'}
+                      </span>
+                    </div>
+                    <span
+                      className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
+                        item.isValidEan
+                          ? 'text-emerald-500 bg-emerald-500/10'
+                          : 'text-amber-500 bg-amber-500/10'
+                      }`}
+                    >
+                      {item.isValidEan ? '✓ EAN' : '!'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+        </div>
       )}
 
       {/* Pantry Management Modal */}
@@ -403,15 +497,19 @@ export const App: React.FC = () => {
           currentPantry={currentPantry}
           currentUserId={session.user.telegram_id}
           lang={lang}
-          onSelectPantry={(p) => setCurrentPantry(p)}
+          onSelectPantry={(p) => {
+            setCurrentPantry(p);
+            setInventoryRefreshKey((k) => k + 1);
+          }}
           onUpdatePantries={(updatedPantries, newActive) => {
             setPantries(updatedPantries);
             if (newActive) setCurrentPantry(newActive);
+            setInventoryRefreshKey((k) => k + 1);
           }}
         />
       )}
 
-      {/* Product Card / Recognition Modal */}
+      {/* Stage 4 Product Card / Add Modal */}
       {selectedProductBarcode && (
         <ProductCardModal
           isOpen={isProductModalOpen}
@@ -424,6 +522,7 @@ export const App: React.FC = () => {
             setToastMessage(`✓ «${item.name}» (${item.quantity} шт.) добавлен на склад (до ${item.expiration_date})!`);
             triggerHaptic('success');
             setTimeout(() => setToastMessage(null), 3500);
+            setInventoryRefreshKey((k) => k + 1);
           }}
           onProductConfirmed={(p) => {
             setToastMessage(`✓ Товар «${p.name}» (${p.quantity} шт.) подтвержден!`);
@@ -431,6 +530,16 @@ export const App: React.FC = () => {
           }}
         />
       )}
+
+      {/* Stage 5 FIFO Batch Picker Modal */}
+      <FifoBatchPickerModal
+        isOpen={isFifoModalOpen}
+        barcode={fifoBarcode}
+        items={fifoBatches}
+        lang={lang}
+        onClose={() => setIsFifoModalOpen(false)}
+        onSelectBatch={handleSelectFifoBatch}
+      />
     </div>
   );
 };

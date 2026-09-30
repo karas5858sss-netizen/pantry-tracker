@@ -83,6 +83,17 @@ export interface DatabaseClient {
   // Stage 4: Items & Expiration dates
   createItem: (item: CreateItemData) => Promise<ItemRecord>;
   getPantryItems: (pantryId: string, status?: 'active' | 'consumed' | 'discarded') => Promise<ItemRecord[]>;
+
+  // Stage 5: Inventory management & FIFO
+  getItem: (itemId: string) => Promise<ItemRecord | null>;
+  updateItem: (itemId: string, updates: UpdateItemData) => Promise<ItemRecord>;
+  getActiveItemsByBarcode: (pantryId: string, barcode: string) => Promise<ItemRecord[]>;
+}
+
+export interface UpdateItemData {
+  quantity?: number;
+  status?: 'active' | 'consumed' | 'discarded';
+  closed_at?: string | null;
 }
 
 export interface ItemRecord {

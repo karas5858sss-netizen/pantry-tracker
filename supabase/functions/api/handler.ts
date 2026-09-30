@@ -12,7 +12,13 @@ import {
   handleUpdateWriteAccess,
 } from './pantries.ts';
 import { handleGetProduct, handleUpsertProduct } from './products.ts';
-import { handleCreateItem, handleGetPantryItems } from './items.ts';
+import {
+  handleCreateItem,
+  handleGetPantryItems,
+  handleConsumeItem,
+  handleRestoreItem,
+  handleConsumeBarcodeFifo,
+} from './items.ts';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -140,6 +146,41 @@ export async function handleApiRequest(req: Request, deps: ApiDependencies): Pro
   if (getMembersMatch && req.method === 'GET') {
     const pantryId = getMembersMatch[1];
     const res = await handleGetMembers(user, pantryId, deps);
+    return addCors(res);
+  }
+
+  // Route: POST /pantries/:id/items/consume-barcode (FIFO scan consumption)
+  const consumeBarcodeMatch = pathname.match(/^\/pantries\/([^/]+)\/items\/consume-barcode$/);
+  if (consumeBarcodeMatch && req.method === 'POST') {
+    const pantryId = consumeBarcodeMatch[1];
+    const res = await handleConsumeBarcodeFifo(user, pantryId, req, deps);
+    return addCors(res);
+  }
+
+  // Route: POST /pantries/:id/items/:itemId/consume (manual consume)
+  const consumeItemMatch = pathname.match(/^\/pantries\/([^/]+)\/items\/([^/]+)\/consume$/);
+  if (consumeItemMatch && req.method === 'POST') {
+    const pantryId = consumeItemMatch[1];
+    const itemId = consumeItemMatch[2];
+    const res = await handleConsumeItem(user, pantryId, itemId, req, deps, 'consumed');
+    return addCors(res);
+  }
+
+  // Route: POST /pantries/:id/items/:itemId/discard (manual discard)
+  const discardItemMatch = pathname.match(/^\/pantries\/([^/]+)\/items\/([^/]+)\/discard$/);
+  if (discardItemMatch && req.method === 'POST') {
+    const pantryId = discardItemMatch[1];
+    const itemId = discardItemMatch[2];
+    const res = await handleConsumeItem(user, pantryId, itemId, req, deps, 'discarded');
+    return addCors(res);
+  }
+
+  // Route: POST /pantries/:id/items/:itemId/restore (undo consumption)
+  const restoreItemMatch = pathname.match(/^\/pantries\/([^/]+)\/items\/([^/]+)\/restore$/);
+  if (restoreItemMatch && req.method === 'POST') {
+    const pantryId = restoreItemMatch[1];
+    const itemId = restoreItemMatch[2];
+    const res = await handleRestoreItem(user, pantryId, itemId, req, deps);
     return addCors(res);
   }
 

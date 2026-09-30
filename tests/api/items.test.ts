@@ -12,6 +12,7 @@ import type {
   CreateItemData,
   ItemRecord,
   ProductRecord,
+  UpdateItemData,
 } from '../../supabase/functions/api/types.ts';
 
 const TEST_BOT_TOKEN = '123456789:ABCDEF_mock_bot_token_for_tests';
@@ -191,6 +192,27 @@ function createMockDb(): DatabaseClient & {
     async getPantryItems(pantryId: string, status: 'active' | 'consumed' | 'discarded' = 'active'): Promise<ItemRecord[]> {
       return itemsList
         .filter((item) => item.pantry_id === pantryId && item.status === status)
+        .sort((a, b) => a.expiration_date.localeCompare(b.expiration_date));
+    },
+
+    async getItem(itemId: string): Promise<ItemRecord | null> {
+      return itemsList.find((i) => i.id === itemId) || null;
+    },
+
+    async updateItem(itemId: string, updates: UpdateItemData): Promise<ItemRecord> {
+      const item = itemsList.find((i) => i.id === itemId);
+      if (!item) {
+        throw new Error('Item not found');
+      }
+      if (updates.quantity !== undefined) item.quantity = updates.quantity;
+      if (updates.status !== undefined) item.status = updates.status;
+      if (updates.closed_at !== undefined) item.closed_at = updates.closed_at;
+      return { ...item };
+    },
+
+    async getActiveItemsByBarcode(pantryId: string, barcode: string): Promise<ItemRecord[]> {
+      return itemsList
+        .filter((item) => item.pantry_id === pantryId && item.barcode === barcode && item.status === 'active')
         .sort((a, b) => a.expiration_date.localeCompare(b.expiration_date));
     },
   };
@@ -373,4 +395,152 @@ describe('Stage 4: Items & Expiration Dates API', () => {
       expect(data.items[1].name).toBe('Сыр Гауда');
     });
   });
+
+  describe('Stage 5: Inventory Management, Consumption & FIFO API', () => {
+    let itemMultiQty: ItemRecord;
+    let itemSingleQty: ItemRecord;
+    let batchEarlier: ItemRecord;
+    let batchLater: ItemRecord;
+
+    beforeEach(async () => {
+      itemMultiQty = await mockDb.createItem({
+        pantry_id: 'pantry-1',
+        name: 'Йогурт клубничный',
+        expiration_date: '2026-10-10',
+        quantity: 3,
+        created_by: ownerUser.id,
+      });
+
+      itemSingleQty = await mockDb.createItem({
+        pantry_id: 'pantry-1',
+        name: 'Хлеб бородинский',
+        expiration_date: '2026-10-02',
+        quantity: 1,
+        created_by: ownerUser.id,
+      });
+
+      // Two batches of same product with same barcode but different dates
+      batchEarlier = await mockDb.createItem({
+        pantry_id: 'pantry-1',
+        barcode: '4601234567890',
+        name: 'Молоко 3.2%',
+        expiration_date: '2026-10-04',
+        quantity: 2,
+        created_by: ownerUser.id,
+      });
+
+      batchLater = await mockDb.createItem({
+        pantry_id: 'pantry-1',
+        barcode: '4601234567890',
+        name: 'Молоко 3.2%',
+        expiration_date: '2026-10-12',
+        quantity: 1,
+        created_by: ownerUser.id,
+      });
+    });
+
+    describe('Manual Consumption and Discarding', () => {
+      it('decrements quantity by 1 and keeps status active when quantity > 1', async () => {
+        const res = await makeAuthRequest(ownerUser, 'POST', `/pantries/pantry-1/items/${itemMultiQty.id}/consume`);
+        expect(res.status).toBe(200);
+        const data = await res.json();
+        expect(data.item.id).toBe(itemMultiQty.id);
+        expect(data.item.quantity).toBe(2);
+        expect(data.item.status).toBe('active');
+        expect(data.item.closed_at).toBeNull();
+        expect(data.previousState.quantity).toBe(3);
+      });
+
+      it('closes item with status consumed and sets closed_at when quantity is 1', async () => {
+        const res = await makeAuthRequest(ownerUser, 'POST', `/pantries/pantry-1/items/${itemSingleQty.id}/consume`);
+        expect(res.status).toBe(200);
+        const data = await res.json();
+        expect(data.item.id).toBe(itemSingleQty.id);
+        expect(data.item.status).toBe('consumed');
+        expect(data.item.closed_at).toBe(fixedNow.toISOString());
+      });
+
+      it('closes item with status discarded when discarded', async () => {
+        const res = await makeAuthRequest(ownerUser, 'POST', `/pantries/pantry-1/items/${itemSingleQty.id}/discard`);
+        expect(res.status).toBe(200);
+        const data = await res.json();
+        expect(data.item.id).toBe(itemSingleQty.id);
+        expect(data.item.status).toBe('discarded');
+        expect(data.item.closed_at).toBe(fixedNow.toISOString());
+      });
+
+      it('restores previously consumed item back to active (Undo operation)', async () => {
+        // 1. Consume
+        const consumeRes = await makeAuthRequest(ownerUser, 'POST', `/pantries/pantry-1/items/${itemSingleQty.id}/consume`);
+        const consumeData = await consumeRes.json();
+        expect(consumeData.item.status).toBe('consumed');
+
+        // 2. Undo/Restore
+        const restoreRes = await makeAuthRequest(ownerUser, 'POST', `/pantries/pantry-1/items/${itemSingleQty.id}/restore`, {
+          quantity: consumeData.previousState.quantity,
+          status: consumeData.previousState.status,
+          closed_at: consumeData.previousState.closed_at,
+        });
+
+        expect(restoreRes.status).toBe(200);
+        const restoreData = await restoreRes.json();
+        expect(restoreData.item.status).toBe('active');
+        expect(restoreData.item.quantity).toBe(1);
+        expect(restoreData.item.closed_at).toBeNull();
+      });
+    });
+
+    describe('FIFO Scan Consumption (POST /pantries/:id/items/consume-barcode)', () => {
+      it('returns found: false when barcode does not exist in active inventory', async () => {
+        const res = await makeAuthRequest(ownerUser, 'POST', '/pantries/pantry-1/items/consume-barcode', {
+          barcode: '9999999999999',
+        });
+        expect(res.status).toBe(200);
+        const data = await res.json();
+        expect(data.found).toBe(false);
+      });
+
+      it('detects multiple batches with different expiration dates and returns batch list without consuming', async () => {
+        const res = await makeAuthRequest(ownerUser, 'POST', '/pantries/pantry-1/items/consume-barcode', {
+          barcode: '4601234567890',
+        });
+        expect(res.status).toBe(200);
+        const data = await res.json();
+        expect(data.found).toBe(true);
+        expect(data.multipleBatches).toBe(true);
+        expect(data.items).toHaveLength(2);
+        // First batch should be earliest date (2026-10-04)
+        expect(data.items[0].id).toBe(batchEarlier.id);
+        expect(data.items[0].expiration_date).toBe('2026-10-04');
+        expect(data.items[1].id).toBe(batchLater.id);
+      });
+
+      it('consumes earliest batch when force: true is passed (FIFO principle)', async () => {
+        const res = await makeAuthRequest(ownerUser, 'POST', '/pantries/pantry-1/items/consume-barcode', {
+          barcode: '4601234567890',
+          force: true,
+        });
+        expect(res.status).toBe(200);
+        const data = await res.json();
+        expect(data.found).toBe(true);
+        expect(data.multipleBatches).toBe(false);
+        expect(data.item.id).toBe(batchEarlier.id);
+        expect(data.item.quantity).toBe(1); // was 2, decremented to 1
+        expect(data.item.status).toBe('active');
+      });
+
+      it('consumes specific batch when itemId is provided', async () => {
+        const res = await makeAuthRequest(ownerUser, 'POST', '/pantries/pantry-1/items/consume-barcode', {
+          barcode: '4601234567890',
+          itemId: batchLater.id,
+        });
+        expect(res.status).toBe(200);
+        const data = await res.json();
+        expect(data.found).toBe(true);
+        expect(data.item.id).toBe(batchLater.id);
+        expect(data.item.status).toBe('consumed'); // was 1, closed
+      });
+    });
+  });
 });
+

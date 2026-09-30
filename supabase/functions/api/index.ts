@@ -17,6 +17,7 @@ import type {
   ProductRecord,
   ItemRecord,
   CreateItemData,
+  UpdateItemData,
 } from './types.ts';
 import {
   getOffApiUrl,
@@ -382,6 +383,50 @@ const db: DatabaseClient = {
 
     if (error) {
       console.error('Error fetching pantry items:', error);
+      return [];
+    }
+    return data ?? [];
+  },
+
+  async getItem(itemId: string): Promise<ItemRecord | null> {
+    const { data, error } = await supabase
+      .from('items')
+      .select('*')
+      .eq('id', itemId)
+      .maybeSingle();
+
+    if (error) {
+      console.error('Error fetching item:', error);
+      return null;
+    }
+    return data;
+  },
+
+  async updateItem(itemId: string, updates: UpdateItemData): Promise<ItemRecord> {
+    const { data, error } = await supabase
+      .from('items')
+      .update(updates)
+      .eq('id', itemId)
+      .select()
+      .single();
+
+    if (error || !data) {
+      throw new Error(`Failed to update item: ${error?.message}`);
+    }
+    return data;
+  },
+
+  async getActiveItemsByBarcode(pantryId: string, barcode: string): Promise<ItemRecord[]> {
+    const { data, error } = await supabase
+      .from('items')
+      .select('*')
+      .eq('pantry_id', pantryId)
+      .eq('barcode', barcode)
+      .eq('status', 'active')
+      .order('expiration_date', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching active items by barcode:', error);
       return [];
     }
     return data ?? [];
