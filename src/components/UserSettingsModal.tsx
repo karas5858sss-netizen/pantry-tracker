@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { SessionUser } from '../api.ts';
-import { updateUserSettings, updateWriteAccess } from '../api.ts';
+import { updateUserSettings, updateWriteAccess, sendTestReminder } from '../api.ts';
 import { t, type SupportedLanguage } from '@shared/i18n.ts';
 import { triggerHaptic } from '../telegram.ts';
 
@@ -42,6 +42,8 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
   const [timezone, setTimezone] = useState(user.timezone || 'Europe/Moscow');
   const [canWritePm, setCanWritePm] = useState(user.can_write_pm);
   const [isSaving, setIsSaving] = useState(false);
+  const [isTestingReminder, setIsTestingReminder] = useState(false);
+  const [testSuccessMessage, setTestSuccessMessage] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
@@ -52,11 +54,32 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
       setTimezone(user.timezone || 'Europe/Moscow');
       setCanWritePm(user.can_write_pm);
       setErrorMsg(null);
+      setTestSuccessMessage(null);
       setSaveSuccess(false);
     }
   }, [isOpen, user]);
 
   if (!isOpen) return null;
+
+  const handleSendTestReminder = async () => {
+    setIsTestingReminder(true);
+    setErrorMsg(null);
+    setTestSuccessMessage(null);
+    triggerHaptic('light');
+
+    const res = await sendTestReminder();
+    setIsTestingReminder(false);
+
+    if (res.data?.success) {
+      triggerHaptic('success');
+      setCanWritePm(true);
+      setTestSuccessMessage(res.data.message || t(lang, 'settings_test_reminder_success'));
+      setTimeout(() => setTestSuccessMessage(null), 5000);
+    } else {
+      triggerHaptic('error');
+      setErrorMsg(res.error?.error || 'Не удалось отправить тестовое напоминание');
+    }
+  };
 
   const handleRequestPmAccess = () => {
     triggerHaptic('light');
@@ -82,7 +105,7 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
     }
 
     // Fallback: open bot in Telegram chat
-    const botUser = 'pantry_tracker_bot';
+    const botUser = (window as any).Telegram?.WebApp?.initDataUnsafe?.bot?.username || 'sklad_jli_bot';
     const tgApp = typeof window !== 'undefined' ? (window.Telegram?.WebApp as any) : undefined;
     if (tgApp?.openTelegramLink) {
       tgApp.openTelegramLink(`https://t.me/${botUser}?start=settings`);
@@ -214,6 +237,30 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
               <span>Доступ к отправке сообщений в Telegram активен</span>
             </div>
           )}
+
+          {/* Test reminder action button */}
+          <div className="p-3 bg-tg-secondary/70 rounded-2xl border border-tg-hint/15 space-y-2">
+            <button
+              type="button"
+              disabled={isTestingReminder}
+              onClick={handleSendTestReminder}
+              className="w-full py-2.5 px-3 bg-tg-button/10 hover:bg-tg-button/15 text-tg-button border border-tg-button/25 font-semibold rounded-xl text-xs flex items-center justify-center gap-1.5 transition active:scale-98 disabled:opacity-50"
+            >
+              <span className={isTestingReminder ? 'animate-spin' : ''}>
+                {isTestingReminder ? '⏳' : '🔔'}
+              </span>
+              <span>
+                {isTestingReminder
+                  ? t(lang, 'settings_test_reminder_sending')
+                  : t(lang, 'settings_test_reminder_btn')}
+              </span>
+            </button>
+            {testSuccessMessage && (
+              <div className="p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-[11px] text-emerald-500 font-medium text-center">
+                ✓ {testSuccessMessage}
+              </div>
+            )}
+          </div>
 
           {/* 3. Reminder Hour Picker */}
           <div className="p-3.5 bg-tg-secondary rounded-2xl border border-tg-hint/15 space-y-2.5">

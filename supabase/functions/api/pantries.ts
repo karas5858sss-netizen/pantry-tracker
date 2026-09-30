@@ -1,6 +1,14 @@
 import type { ApiDependencies } from './types.ts';
 import type { TelegramUser } from '../../../shared/telegramAuth.ts';
 import { generateInviteCode, formatInviteLink, isValidInviteCode } from '../../../shared/invites.ts';
+import {
+  getUserLocalDate,
+  calculateDaysRemaining,
+  categorizeReminderStage,
+  formatPantryReminderHtml,
+  type ReminderItem,
+} from '../../../shared/reminders.ts';
+import { t, type SupportedLanguage } from '../../../shared/i18n.ts';
 
 export async function handleCreatePantry(
   user: TelegramUser,
@@ -308,4 +316,116 @@ export async function handleUpdateWriteAccess(
     status: 200,
     headers: { 'Content-Type': 'application/json' },
   });
+}
+
+export async function handleTestReminder(
+  user: TelegramUser,
+  _req: Request,
+  deps: ApiDependencies
+): Promise<Response> {
+  if (!deps.botToken) {
+    return new Response(
+      JSON.stringify({
+        error: 'В настройках Supabase Edge Function не задан BOT_TOKEN. Укажите его в Supabase Secrets.',
+        code: 'NO_BOT_TOKEN',
+      }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+
+  const userRecord = await deps.db.getUser(user.id);
+  const lang = (userRecord?.language_code || user.language_code || 'ru') as SupportedLanguage;
+  const tz = userRecord?.timezone || 'Europe/Moscow';
+  const now = deps.now ? deps.now() : new Date();
+  const userLocalDate = getUserLocalDate(now, tz);
+
+  const pantries = await deps.db.getUserPantries(user.id);
+  const allExpiringSections: string[] = [];
+
+  for (const pantry of pantries) {
+    const items = await deps.db.getPantryItems(pantry.id, 'active');
+    const reminderItems: ReminderItem[] = [];
+
+    for (const item of items) {
+      const daysRemaining = calculateDaysRemaining(item.expiration_date, userLocalDate);
+      const stage = categorizeReminderStage(daysRemaining);
+      if (stage) {
+        reminderItems.push({
+          id: item.id,
+          name: item.name,
+          quantity: item.quantity,
+          expiration_date: item.expiration_date,
+          stage,
+          daysRemaining,
+        });
+      }
+    }
+
+    if (reminderItems.length > 0) {
+      const formatted = formatPantryReminderHtml(pantry.name, reminderItems, lang);
+      if (formatted) {
+        allExpiringSections.push(formatted);
+      }
+    }
+  }
+
+  let textToSend = '';
+  if (allExpiringSections.length > 0) {
+    textToSend = allExpiringSections.join('\n\n');
+  } else {
+    textToSend = `🔔 <b>${t(lang, 'settings_title')}</b> (Тест)\n\n✓ Бот успешно подключен к вашему Telegram!\nНа ваших складах всё в порядке, просроченных или критических товаров нет.`;
+  }
+
+  try {
+    const fetchFn = (deps as any).fetch || fetch;
+    const tgRes = await fetchFn(`https://api.telegram.org/bot${deps.botToken}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: user.id,
+        text: textToSend,
+        parse_mode: 'HTML',
+      }),
+    });
+
+    if (tgRes.status === 403) {
+      await deps.db.updateCanWritePm(user.id, false);
+      return new Response(
+        JSON.stringify({
+          error: t(lang, 'settings_bot_blocked_warn'),
+          code: 'BOT_BLOCKED',
+        }),
+        { status: 403, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (!tgRes.ok) {
+      const errBody = await tgRes.text().catch(() => '');
+      return new Response(
+        JSON.stringify({
+          error: `Telegram API error: ${errBody || tgRes.statusText}`,
+          code: 'TELEGRAM_ERROR',
+        }),
+        { status: 502, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    await deps.db.updateCanWritePm(user.id, true);
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        message: 'Тестовое уведомление успешно отправлено в Telegram!',
+      }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } }
+    );
+  } catch (err: any) {
+    return new Response(
+      JSON.stringify({
+        error: `Не удалось связаться с Telegram API: ${err?.message || 'ошибка сети'}`,
+        code: 'NETWORK_ERROR',
+      }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
 }

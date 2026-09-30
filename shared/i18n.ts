@@ -146,6 +146,9 @@ export const translations = {
     settings_saved: 'Настройки сохранены!',
     settings_bot_blocked_warn: 'Для получения напоминаний напишите боту в личные сообщения /start',
     settings_open_bot: 'Открыть диалог с ботом',
+    settings_test_reminder_btn: 'Отправить тест в Telegram',
+    settings_test_reminder_success: 'Тестовое уведомление отправлено!',
+    settings_test_reminder_sending: 'Отправка...',
 
     // Stage 8: OCR Date Recognition
     ocr_scan_btn: 'Скан даты',
@@ -306,6 +309,9 @@ export const translations = {
     settings_saved: '¡Ajustes guardados!',
     settings_bot_blocked_warn: 'Para recibir avisos, envía /start al bot por mensaje privado',
     settings_open_bot: 'Abrir chat con el bot',
+    settings_test_reminder_btn: 'Enviar recordatorio de prueba',
+    settings_test_reminder_success: '¡Recordatorio de prueba enviado!',
+    settings_test_reminder_sending: 'Enviando...',
 
     // Stage 8: OCR Date Recognition
     ocr_scan_btn: 'Escanear fecha',
@@ -466,6 +472,9 @@ export const translations = {
     settings_saved: 'Settings saved!',
     settings_bot_blocked_warn: 'To receive notifications, message /start to the bot in direct chat',
     settings_open_bot: 'Open chat with bot',
+    settings_test_reminder_btn: 'Send test reminder',
+    settings_test_reminder_success: 'Test reminder sent!',
+    settings_test_reminder_sending: 'Sending...',
 
     // Stage 8: OCR Date Recognition
     ocr_scan_btn: 'Scan date',

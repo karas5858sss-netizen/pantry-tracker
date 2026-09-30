@@ -405,4 +405,66 @@ describe('API POST /session Pure Handler', () => {
     const invalidBody = await invalidRes.json();
     expect(invalidBody.code).toBe('INVALID_REMINDER_HOUR');
   });
+
+  it('handles POST /user/test-reminder to send instant reminder via Telegram', async () => {
+    mockDb.allowedUsersSet.add(1001);
+    const user: TelegramUser = { id: 1001, first_name: 'Alice', allows_write_to_pm: true };
+    const initData = await createTestInitData(user, TEST_BOT_TOKEN, {
+      authDateSeconds: Math.floor(fixedNow.getTime() / 1000) - 10,
+    });
+
+    // 1. Initialize user session with allows_write_to_pm: true
+    const sessionReq = new Request('https://example.com/api/session', {
+      method: 'POST',
+      headers: {
+        Authorization: `tma ${initData}`,
+        'Content-Type': 'application/json',
+      },
+    });
+    const sessionRes = await handleApiRequest(sessionReq, deps);
+    const sessionData = await sessionRes.json();
+    expect(sessionData.user.can_write_pm).toBe(true);
+
+    // 2. Test reminder when Telegram sends successfully
+    let sentPayload: any = null;
+    const mockFetch = async (_url: string, opts: any) => {
+      sentPayload = JSON.parse(opts.body);
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    };
+
+    const testDeps = {
+      ...deps,
+      fetch: mockFetch,
+    };
+
+    const testReq = new Request('https://example.com/api/user/test-reminder', {
+      method: 'POST',
+      headers: {
+        Authorization: `tma ${initData}`,
+      },
+    });
+
+    const testRes = await handleApiRequest(testReq, testDeps);
+    expect(testRes.status).toBe(200);
+    const testData = await testRes.json();
+    expect(testData.success).toBe(true);
+    expect(sentPayload.chat_id).toBe(1001);
+    expect(sentPayload.text).toContain('Тест');
+
+    // 3. Test reminder when Telegram returns 403 (user blocked bot)
+    const blockedFetch = async () => {
+      return new Response(JSON.stringify({ ok: false, error_code: 403 }), { status: 403 });
+    };
+
+    const blockedDeps = {
+      ...deps,
+      fetch: blockedFetch,
+    };
+
+    const blockedRes = await handleApiRequest(testReq, blockedDeps);
+    expect(blockedRes.status).toBe(403);
+    const blockedData = await blockedRes.json();
+    expect(blockedData.code).toBe('BOT_BLOCKED');
+    expect(mockDb.usersMap.get(1001)?.can_write_pm).toBe(false);
+  });
 });

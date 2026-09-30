@@ -62,6 +62,11 @@ export async function handleSession(
     timezone: clientTimezone,
   });
 
+  if (user.allows_write_to_pm && !savedUser.can_write_pm) {
+    await deps.db.updateCanWritePm(user.id, true);
+    savedUser.can_write_pm = true;
+  }
+
   // 5. Fetch or create personal pantry
   let pantries = await deps.db.getUserPantries(user.id);
 

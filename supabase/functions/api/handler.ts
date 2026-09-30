@@ -10,6 +10,7 @@ import {
   handleRemoveMember,
   handleGetMembers,
   handleUpdateWriteAccess,
+  handleTestReminder,
 } from './pantries.ts';
 import { handleGetProduct, handleUpsertProduct } from './products.ts';
 import {
@@ -96,6 +97,12 @@ export async function handleApiRequest(req: Request, deps: ApiDependencies): Pro
   // Route: POST /user/write-access
   if (pathname === '/user/write-access' && req.method === 'POST') {
     const res = await handleUpdateWriteAccess(user, req, deps);
+    return addCors(res);
+  }
+
+  // Route: POST /user/test-reminder
+  if (pathname === '/user/test-reminder' && req.method === 'POST') {
+    const res = await handleTestReminder(user, req, deps);
     return addCors(res);
   }
 

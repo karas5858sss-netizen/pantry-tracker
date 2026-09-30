@@ -139,6 +139,15 @@ export async function updateWriteAccess(canWrite: boolean): Promise<{ success: b
 }
 
 /**
+ * Sends an immediate test reminder to the user's Telegram chat.
+ */
+export async function sendTestReminder(): Promise<{ data?: { success: boolean; message: string }; error?: ApiError }> {
+  return requestApi<{ success: boolean; message: string }>('/user/test-reminder', {
+    method: 'POST',
+  });
+}
+
+/**
  * Creates a new personal or shared pantry.
  */
 export async function createPantry(name: string): Promise<{ data?: { pantry: Pantry }; error?: ApiError }> {
