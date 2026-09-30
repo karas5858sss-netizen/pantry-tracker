@@ -94,7 +94,7 @@ alter table reminder_log enable row level security;
 -- 9. Atomic Operations for Pantry Items (Concurrency & Race-condition safe)
 
 -- Atomic Consume Item with row-level locking
-create or replace function consume_pantry_item(
+create or replace function public.consume_pantry_item(
   p_item_id uuid,
   p_action text default 'consumed',
   p_all boolean default false
@@ -102,16 +102,17 @@ create or replace function consume_pantry_item(
 returns jsonb
 language plpgsql
 security definer
+set search_path = ''
 as $$
 declare
-  v_item items%rowtype;
+  v_item public.items%rowtype;
   v_prev_qty int;
   v_prev_status text;
   v_prev_closed timestamptz;
 begin
   -- Row lock to prevent concurrent decrement race conditions
   select * into v_item
-  from items
+  from public.items
   where id = p_item_id
   for update;
 
@@ -124,21 +125,21 @@ begin
   v_prev_closed := v_item.closed_at;
 
   if v_item.quantity > 1 and not p_all then
-    update items
+    update public.items
     set quantity = quantity - 1
     where id = p_item_id
     returning * into v_item;
   else
-    update items
+    update public.items
     set status = p_action,
-        closed_at = now()
+        closed_at = pg_catalog.now()
     where id = p_item_id
     returning * into v_item;
   end if;
 
-  return jsonb_build_object(
-    'item', to_jsonb(v_item),
-    'previousState', jsonb_build_object(
+  return pg_catalog.jsonb_build_object(
+    'item', pg_catalog.to_jsonb(v_item),
+    'previousState', pg_catalog.jsonb_build_object(
       'id', p_item_id,
       'quantity', v_prev_qty,
       'status', v_prev_status,
@@ -149,7 +150,7 @@ end;
 $$;
 
 -- Atomic Merge or Create Item with row-level locking
-create or replace function merge_or_create_item(
+create or replace function public.merge_or_create_item(
   p_pantry_id uuid,
   p_barcode text,
   p_name text,
@@ -160,39 +161,40 @@ create or replace function merge_or_create_item(
 returns jsonb
 language plpgsql
 security definer
+set search_path = ''
 as $$
 declare
-  v_item items%rowtype;
+  v_item public.items%rowtype;
 begin
   -- Lock candidate active batch
   select * into v_item
-  from items
+  from public.items
   where pantry_id = p_pantry_id
     and expiration_date = p_expiration_date
     and status = 'active'
     and (
       (p_barcode is not null and barcode = p_barcode) or
-      (p_barcode is null and barcode is null and lower(name) = lower(p_name))
+      (p_barcode is null and barcode is null and pg_catalog.lower(name) = pg_catalog.lower(p_name))
     )
   for update;
 
   if found then
-    update items
+    update public.items
     set quantity = quantity + p_quantity
     where id = v_item.id
     returning * into v_item;
-    return jsonb_build_object('item', to_jsonb(v_item), 'merged', true);
+    return pg_catalog.jsonb_build_object('item', pg_catalog.to_jsonb(v_item), 'merged', true);
   else
-    insert into items (pantry_id, barcode, name, expiration_date, quantity, status, created_by)
+    insert into public.items (pantry_id, barcode, name, expiration_date, quantity, status, created_by)
     values (p_pantry_id, p_barcode, p_name, p_expiration_date, p_quantity, 'active', p_created_by)
     returning * into v_item;
-    return jsonb_build_object('item', to_jsonb(v_item), 'merged', false);
+    return pg_catalog.jsonb_build_object('item', pg_catalog.to_jsonb(v_item), 'merged', false);
   end if;
 end;
 $$;
 
 -- Atomic Register or Update User with strict 10-user limit
-create or replace function register_user_with_limit(
+create or replace function public.register_user_with_limit(
   p_telegram_id bigint,
   p_first_name text,
   p_username text,
@@ -202,115 +204,138 @@ create or replace function register_user_with_limit(
 returns jsonb
 language plpgsql
 security definer
+set search_path = ''
 as $$
 declare
-  v_user users%rowtype;
+  v_user public.users%rowtype;
   v_count int;
 begin
   -- If user already registered, update profile and return
-  select * into v_user from users where telegram_id = p_telegram_id;
+  select * into v_user from public.users where telegram_id = p_telegram_id;
   if found then
-    update users
+    update public.users
     set first_name = p_first_name,
         username = p_username,
-        language_code = coalesce(p_language_code, language_code),
-        timezone = coalesce(p_timezone, timezone)
+        language_code = pg_catalog.coalesce(p_language_code, language_code),
+        timezone = pg_catalog.coalesce(p_timezone, timezone)
     where telegram_id = p_telegram_id
     returning * into v_user;
-    return jsonb_build_object('user', to_jsonb(v_user), 'is_new', false);
+    return pg_catalog.jsonb_build_object('user', pg_catalog.to_jsonb(v_user), 'is_new', false);
   end if;
 
   -- Transaction-level advisory lock serializes concurrent new-user registrations
-  perform pg_advisory_xact_lock(737373);
-  select count(*) into v_count from users;
+  perform pg_catalog.pg_advisory_xact_lock(737373);
+  select count(*) into v_count from public.users;
   if v_count >= 10 then
-    return jsonb_build_object('error', 'USER_LIMIT_REACHED');
+    return pg_catalog.jsonb_build_object('error', 'USER_LIMIT_REACHED');
   end if;
 
-  insert into users (telegram_id, first_name, username, language_code, timezone)
-  values (p_telegram_id, p_first_name, p_username, coalesce(p_language_code, 'ru'), coalesce(p_timezone, 'Europe/Moscow'))
+  insert into public.users (telegram_id, first_name, username, language_code, timezone)
+  values (p_telegram_id, p_first_name, p_username, pg_catalog.coalesce(p_language_code, 'ru'), pg_catalog.coalesce(p_timezone, 'Europe/Moscow'))
   returning * into v_user;
 
-  return jsonb_build_object('user', to_jsonb(v_user), 'is_new', true);
+  return pg_catalog.jsonb_build_object('user', pg_catalog.to_jsonb(v_user), 'is_new', true);
 end;
 $$;
 
 -- Atomic Join Pantry via Invite Code with row-level locking
-create or replace function join_pantry_via_invite(
+create or replace function public.join_pantry_via_invite(
   p_code text,
   p_user_id bigint
 )
 returns jsonb
 language plpgsql
 security definer
+set search_path = ''
 as $$
 declare
-  v_invite pantry_invites%rowtype;
-  v_pantry pantries%rowtype;
-  v_member pantry_members%rowtype;
+  v_invite public.pantry_invites%rowtype;
+  v_pantry public.pantries%rowtype;
+  v_member public.pantry_members%rowtype;
 begin
   -- 1. Row lock the invite to prevent concurrent exhaustion races
   select * into v_invite
-  from pantry_invites
+  from public.pantry_invites
   where code = p_code
   for update;
 
   if not found then
-    return jsonb_build_object('error', 'INVITE_NOT_FOUND');
+    return pg_catalog.jsonb_build_object('error', 'INVITE_NOT_FOUND');
   end if;
 
-  if v_invite.expires_at < now() then
-    return jsonb_build_object('error', 'INVITE_EXPIRED');
+  if v_invite.expires_at < pg_catalog.now() then
+    return pg_catalog.jsonb_build_object('error', 'INVITE_EXPIRED');
   end if;
 
   -- 2. Check if already a member
   select * into v_member
-  from pantry_members
+  from public.pantry_members
   where pantry_id = v_invite.pantry_id and user_id = p_user_id;
 
   if found then
-    select * into v_pantry from pantries where id = v_invite.pantry_id;
-    return jsonb_build_object('pantry', to_jsonb(v_pantry), 'already_member', true);
+    select * into v_pantry from public.pantries where id = v_invite.pantry_id;
+    return pg_catalog.jsonb_build_object('pantry', pg_catalog.to_jsonb(v_pantry), 'already_member', true);
   end if;
 
   -- 3. Check remaining uses under row lock
   if v_invite.uses >= v_invite.max_uses then
-    return jsonb_build_object('error', 'INVITE_EXHAUSTED');
+    return pg_catalog.jsonb_build_object('error', 'INVITE_EXHAUSTED');
   end if;
 
   -- 4. Atomically insert member and increment uses
-  insert into pantry_members (pantry_id, user_id, role)
+  insert into public.pantry_members (pantry_id, user_id, role)
   values (v_invite.pantry_id, p_user_id, 'member');
 
-  update pantry_invites
+  update public.pantry_invites
   set uses = uses + 1
   where code = p_code;
 
-  select * into v_pantry from pantries where id = v_invite.pantry_id;
-  return jsonb_build_object('pantry', to_jsonb(v_pantry), 'already_member', false);
+  select * into v_pantry from public.pantries where id = v_invite.pantry_id;
+  return pg_catalog.jsonb_build_object('pantry', pg_catalog.to_jsonb(v_pantry), 'already_member', false);
 end;
 $$;
 
 -- Transactional Pantry Creation with Owner Membership
-create or replace function create_pantry_with_owner(
+create or replace function public.create_pantry_with_owner(
   p_name text,
   p_owner_id bigint
 )
 returns jsonb
 language plpgsql
 security definer
+set search_path = ''
 as $$
 declare
-  v_pantry pantries%rowtype;
+  v_pantry public.pantries%rowtype;
 begin
-  insert into pantries (name)
+  insert into public.pantries (name)
   values (p_name)
   returning * into v_pantry;
 
-  insert into pantry_members (pantry_id, user_id, role)
+  insert into public.pantry_members (pantry_id, user_id, role)
   values (v_pantry.id, p_owner_id, 'owner');
 
-  return to_jsonb(v_pantry);
+  return pg_catalog.to_jsonb(v_pantry);
 end;
 $$;
+
+-- 10. RPC Security Hardening: Revoke public execution of SECURITY DEFINER functions
+-- and grant exclusively to service_role to prevent direct anon/authenticated PostgREST bypass
+revoke execute on function public.consume_pantry_item(uuid, text, boolean) from public, anon, authenticated;
+grant execute on function public.consume_pantry_item(uuid, text, boolean) to service_role;
+
+revoke execute on function public.merge_or_create_item(uuid, text, text, date, int, bigint) from public, anon, authenticated;
+grant execute on function public.merge_or_create_item(uuid, text, text, date, int, bigint) to service_role;
+
+revoke execute on function public.register_user_with_limit(bigint, text, text, text, text) from public, anon, authenticated;
+grant execute on function public.register_user_with_limit(bigint, text, text, text, text) to service_role;
+
+revoke execute on function public.join_pantry_via_invite(text, bigint) from public, anon, authenticated;
+grant execute on function public.join_pantry_via_invite(text, bigint) to service_role;
+
+revoke execute on function public.create_pantry_with_owner(text, bigint) from public, anon, authenticated;
+grant execute on function public.create_pantry_with_owner(text, bigint) to service_role;
+
+alter default privileges in schema public revoke execute on functions from public, anon, authenticated;
+
 
