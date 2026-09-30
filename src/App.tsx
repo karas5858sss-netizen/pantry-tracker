@@ -208,7 +208,7 @@ export const App: React.FC = () => {
             ⚙️
           </button>
           <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 font-semibold">
-            Stage 6
+            Stage 7
           </span>
         </div>
       </header>
