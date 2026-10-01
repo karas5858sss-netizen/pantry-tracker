@@ -148,8 +148,8 @@ begin
     update public.users
     set first_name = p_first_name,
         username = p_username,
-        language_code = pg_catalog.coalesce(p_language_code, language_code),
-        timezone = pg_catalog.coalesce(p_timezone, timezone)
+        language_code = coalesce(p_language_code, language_code),
+        timezone = coalesce(p_timezone, timezone)
     where telegram_id = p_telegram_id
     returning * into v_user;
     return pg_catalog.jsonb_build_object('user', pg_catalog.to_jsonb(v_user), 'is_new', false);
@@ -157,13 +157,13 @@ begin
 
   -- Transaction-level advisory lock serializes concurrent new-user registrations
   perform pg_catalog.pg_advisory_xact_lock(737373);
-  select pg_catalog.count(*) into v_count from public.users;
+  select count(*) into v_count from public.users;
   if v_count >= 10 then
     return pg_catalog.jsonb_build_object('error', 'USER_LIMIT_REACHED');
   end if;
 
   insert into public.users (telegram_id, first_name, username, language_code, timezone)
-  values (p_telegram_id, p_first_name, p_username, pg_catalog.coalesce(p_language_code, 'ru'), pg_catalog.coalesce(p_timezone, 'Europe/Moscow'))
+  values (p_telegram_id, p_first_name, p_username, coalesce(p_language_code, 'ru'), coalesce(p_timezone, 'Europe/Moscow'))
   returning * into v_user;
 
   return pg_catalog.jsonb_build_object('user', pg_catalog.to_jsonb(v_user), 'is_new', true);

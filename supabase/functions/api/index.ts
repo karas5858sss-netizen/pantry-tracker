@@ -600,5 +600,25 @@ const deps: ApiDependencies = {
 
 // @ts-expect-error Deno global
 Deno.serve(async (req: Request) => {
-  return handleApiRequest(req, deps);
+  try {
+    return await handleApiRequest(req, deps);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('Unhandled server error in api edge function:', err);
+    return new Response(
+      JSON.stringify({
+        error: `Внутренняя ошибка сервера: ${message}`,
+        code: 'INTERNAL_SERVER_ERROR',
+      }),
+      {
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+          'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+        },
+      }
+    );
+  }
 });
